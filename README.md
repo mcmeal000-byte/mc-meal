@@ -11,6 +11,7 @@ Backend-synced Season 0 build for MC Meal.
 - Crafting
 - Shop buy
 - Shop sell
+- Secret Receipt visible as COMING SOON / locked future utility
 - XP, burn counter, reward pool and market volume
 
 ## Backend endpoints

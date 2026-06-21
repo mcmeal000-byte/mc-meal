@@ -1163,10 +1163,10 @@
       ["Fries Pack", "Fries", 3, 75, "Classic meal side"],
       ["Soda Pack", "Soda", 3, 75, "Classic meal drink"],
       ["Sauce Pack", "Sauce", 3, 120, "Important craft bottleneck"],
-      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key"],
-      ["Recipe Fragment", "Recipe Fragment", 1, 1000, "Rare recipe progress"],
-      ["Secret Receipt", "Secret Receipt", 1, 3500, "Late-game key"],
-      ["Craft Entry", "Craft Entry", 1, 750, "Future premium action"]
+      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key", false],
+      ["Recipe Fragment", "Recipe Fragment", 1, 1000, "Rare recipe progress", false],
+      ["Secret Receipt", "Secret Receipt", 1, 3500, "Hidden Menu utility", true],
+      ["Craft Entry", "Craft Entry", 1, 750, "Future premium action", false]
     ];
 
     const sell = [
@@ -1186,11 +1186,11 @@
         <h3>Buy Materials</h3>
         <p>Use Season 0 $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
         <div class="action-list">
-          ${shop.map(([label,item,qty,price,note]) => `
-            <div class="action-row">
+          ${shop.map(([label,item,qty,price,note,locked]) => `
+            <div class="action-row ${locked ? "locked-row" : ""}">
               <div class="pixel-icon">${icon(item)}</div>
-              <div><strong>${label}</strong><span>${qty}x ${item} · ${price} $MEAL · ${note}</span></div>
-              <button class="small-btn" data-buy="${item}" data-qty="${qty}" data-price="${price}">BUY</button>
+              <div><strong>${label}</strong><span>${locked ? `COMING SOON · ${note}` : `${qty}x ${item} · ${price} $MEAL · ${note}`}</span></div>
+              <button class="small-btn ${locked ? "locked-btn" : ""}" ${locked ? "disabled" : `data-buy="${item}" data-qty="${qty}" data-price="${price}"`}>${locked ? "COMING SOON" : "BUY"}</button>
             </div>
           `).join("")}
         </div>
@@ -1267,7 +1267,13 @@
           addLog(`Bought ${result.qty}x ${result.item}. ${result.burned} $MEAL burned, ${result.pool} to pool.`);
         } catch (err) {
           const msg = err?.message || "shop_buy_failed";
-          addLog(msg === "not_enough_meal" ? `Shop buy failed: not enough $MEAL for ${item}.` : `Shop buy failed: ${msg}.`);
+          addLog(
+            msg === "not_enough_meal"
+              ? `Shop buy failed: not enough $MEAL for ${item}.`
+              : msg === "item_locked_coming_soon"
+                ? `${item} is coming soon. Hidden Menu utility is not active yet.`
+                : `Shop buy failed: ${msg}.`
+          );
         }
         renderShopModal("buy");
       });

@@ -900,3 +900,17 @@ canvas {
     width: 104px;
   }
 }
+
+.action-row.locked-row {
+  opacity: 0.72;
+  border-color: #5a4630;
+  background: #141018;
+}
+
+.small-btn.locked-btn,
+.small-btn:disabled {
+  color: #8b7a55;
+  border-color: #5a4630;
+  background: #17131a;
+  cursor: not-allowed;
+}

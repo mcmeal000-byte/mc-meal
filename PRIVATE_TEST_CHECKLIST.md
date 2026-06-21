@@ -7,6 +7,7 @@
 5. Kitchen opens only after backend check-access + profile-connect succeeds.
 6. Try a non-allowlisted wallet: it must stay locked.
 7. Test Daily, Arcade reward save, Craft, Shop Buy, Shop Sell.
+8. Secret Receipt must show as COMING SOON and must not be buyable.
 
 Current mode: prelaunch_private_test.
 After $MEAL pump.fun launch, replace allowlist access with real token-holder check.
