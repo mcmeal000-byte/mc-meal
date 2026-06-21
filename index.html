@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MC Meal – Launch Alpha</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="game-frame">
+      <div class="brandbar">
+        <div class="brand">
+          <img class="brand-logo" src="assets/mc-meal-logo.png" alt="MC Meal Logo" />
+          <div>
+            <h1>MC MEAL</h1>
+            <p>Launch Alpha Build</p>
+          </div>
+        </div>
+        <div class="chain-pill">Solana · $MEAL</div>
+      </div>
+
+      
+      <div id="startScreen" class="start-screen">
+        <div class="start-card">
+          <div class="start-kicker">Playable Alpha Preview</div>
+          <h2>MC MEAL</h2>
+          <p class="start-tagline">Cook. Craft. Level Up.</p>
+
+          <div class="start-loop">
+            <span>Play</span>
+            <b>→</b>
+            <span>Collect</span>
+            <b>→</b>
+            <span>Craft</span>
+            <b>→</b>
+            <span>Sell / Upgrade</span>
+          </div>
+
+          <div class="start-actions">
+            <button id="enterKitchenBtn" class="primary-start">ENTER KITCHEN</button>
+            <button id="howItWorksBtn" class="secondary-start">HOW IT WORKS</button>
+          </div>
+
+          <div id="howItWorksBox" class="how-box hidden">
+            Walk to the Arcade to play real mini-games. Rewards go into your shared inventory.
+            Craft meals in the Craft House, use the Shop to buy/sell, claim Daily rewards and connect Wallet read-only in Launch.
+          </div>
+
+          <div class="start-note">
+            Alpha mode: demo economy. Wallet is read-only. Real $MEAL transactions come after backend verification.
+          </div>
+        </div>
+      </div>
+
+      <canvas id="hub" width="960" height="640"></canvas>
+
+      <div class="mobile-controls">
+        <div class="move-grid">
+          <button data-key="ArrowUp">▲</button>
+          <div>
+            <button data-key="ArrowLeft">◀</button>
+            <button data-key="ArrowDown">▼</button>
+            <button data-key="ArrowRight">▶</button>
+          </div>
+        </div>
+        <button class="enter-btn" data-key="Enter">ENTER</button>
+      </div>
+
+      <div class="help-line">
+        <strong>Move:</strong> WASD / Arrow Keys · <strong>Open:</strong> Enter · Walk through Kitchen Street. Visit Arcade, Craft House, Shop, Fridge, Leaderboard and Launch Door.
+      </div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle">Station</h2>
+          <p id="modalSubtitle">MC Meal Kitchen</p>
+        </div>
+        <button id="closeModal" class="close-btn">X</button>
+      </div>
+      <div id="modalContent" class="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="shared/mcmeal-save.js"></script>
+  <script src="hub.js"></script>
+</body>
+</html>

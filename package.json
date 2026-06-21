@@ -1,0 +1,9 @@
+{
+  "name": "mc-meal-launch-alpha",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "check": "node --check hub.js && node --check shared/mcmeal-save.js && node --check games/burger/game.js && node --check games/fry/game.js && node --check games/soda/game.js && node --check games/order/game.js"
+  }
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MC Meal – Burger Stack MVP v6</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="game-card">
+      <div class="topbar">
+        <div>
+          <h1>MC MEAL</h1>
+          <p>Burger Stack MVP</p>
+        </div>
+        <div class="pill">Connected to Hub</div>
+      </div>
+
+      <canvas id="game" width="800" height="660"></canvas>
+
+      <div class="mobile-controls" aria-label="Mobile controls">
+        <div class="dpad">
+          <button data-key="ArrowUp">▲</button>
+          <div>
+            <button data-key="ArrowLeft">◀</button>
+            <button data-key="ArrowDown">▼</button>
+            <button data-key="ArrowRight">▶</button>
+          </div>
+        </div>
+        <button class="action" data-key="Space">SAUCE</button>
+      </div>
+
+      <div class="help">
+        <strong>Controls:</strong> Arrow keys / WASD. Climb ladders, walk over burger pieces, dodge enemies, and build the full order in the tray below.
+      </div>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>

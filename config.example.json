@@ -1,0 +1,7 @@
+{
+  "SOLANA_RPC": "https://api.mainnet-beta.solana.com",
+  "MEAL_MINT": "REPLACE_WITH_MEAL_TOKEN_MINT",
+  "TREASURY_WALLET": "REPLACE_WITH_TREASURY_WALLET",
+  "NETWORK": "mainnet-beta",
+  "TOKEN_DECIMALS": 6
+}
