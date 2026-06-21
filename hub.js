@@ -32,6 +32,7 @@
   };
 
   const keys = Object.create(null);
+  const mobileStick = { active: false, pointerId: null, dx: 0, dy: 0, max: 38 };
   let lastTime = 0;
   let hoveredStation = null;
   let modalOpen = false;
@@ -142,6 +143,130 @@
 
   let state = window.MCMealSave ? window.MCMealSave.load() : loadState();
 
+  const BACKEND = {
+    baseUrl: "https://pgublsfhmtjcqcvvgfko.supabase.co/functions/v1",
+    endpoints: {
+      checkAccess: "/check-access",
+      profileConnect: "/profile-connect",
+      dailyClaim: "/daily-claim",
+      submitRun: "/submit-run",
+      craft: "/craft",
+      shopBuy: "/shop-buy-demo",
+      shopSell: "/shop-sell-demo"
+    }
+  };
+
+  const SHOP_ITEM_IDS = {
+    Bun: "bun-pack",
+    Patty: "patty-pack",
+    Fries: "fries-pack",
+    Soda: "soda-pack",
+    Sauce: "sauce-pack",
+    "Mystery Ticket": "mystery-ticket",
+    "Recipe Fragment": "recipe-fragment",
+    "Secret Receipt": "secret-receipt",
+    "Craft Entry": "craft-entry"
+  };
+
+  function shortWallet(address) {
+    return address ? `${address.slice(0, 6)}...${address.slice(-6)}` : "Not connected";
+  }
+
+  async function backendCall(endpoint, payload) {
+    const res = await fetch(`${BACKEND.baseUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {})
+    });
+    let data = null;
+    try { data = await res.json(); } catch { data = { ok: false, error: await res.text() }; }
+    if (!res.ok || !data.ok) {
+      const error = data?.error || `backend_${res.status}`;
+      const e = new Error(error);
+      e.status = res.status;
+      e.data = data;
+      throw e;
+    }
+    return data;
+  }
+
+  function syncBackendState(data) {
+    if (!data) return;
+    const profile = data.profile || null;
+    if (profile) {
+      state.wallet = profile.wallet_address || state.wallet || null;
+      state.accessTier = profile.access_tier || state.accessTier || "Visitor";
+      state.xp = Number(profile.xp || 0);
+      state.meal = Number(profile.meal_balance || 0);
+      state.burned = Number(profile.meal_burned || 0);
+      state.rewardPool = Number(profile.reward_pool || 0);
+      state.bestScore = Number(profile.best_score || 0);
+      state.miniRuns = Number(profile.mini_runs || 0);
+      state.mealsCrafted = Number(profile.meals_crafted || 0);
+      state.marketVolume = Number(profile.market_volume || 0);
+    }
+
+    if (Array.isArray(data.inventory)) {
+      const nextInventory = { ...(state.inventory || {}) };
+      for (const key of Object.keys(nextInventory)) nextInventory[key] = 0;
+      for (const row of data.inventory) nextInventory[row.item_name] = Number(row.qty || 0);
+      state.inventory = nextInventory;
+    }
+
+    const streak = data.dailyStreak || data.streak || null;
+    if (streak) {
+      state.streak = {
+        current: Number(streak.current_streak || 0),
+        lastClaimDate: streak.last_claim_date || null,
+        totalClaims: Number(streak.total_claims || 0)
+      };
+    }
+
+    if (data.allowed === true || data.mode === "prelaunch_private_test") state.prelaunchAccess = true;
+    state.backendSynced = true;
+    state.lastSync = new Date().toISOString();
+    saveState();
+  }
+
+  function hasPrivateAccess() {
+    return Boolean(state.wallet && state.prelaunchAccess === true);
+  }
+
+  function requireWallet(actionLabel = "this action") {
+    if (hasPrivateAccess()) return true;
+    addLog(`Private test access required to use ${actionLabel}. Connect your allowlisted Phantom wallet first.`);
+    return false;
+  }
+
+  function lockedAccessHtml() {
+    return `
+      <div class="modal-panel">
+        <div class="season-badge">PRIVATE TEST LOCKED</div>
+        <h3>Access locked before $MEAL launch</h3>
+        <p>The Kitchen is currently open only for allowlisted test wallets. After the pump.fun launch, this gate will switch to real $MEAL holder access.</p>
+        <div class="roadmap">
+          <div><strong>Allowed now:</strong> private test wallets only</div>
+          <div><strong>Next:</strong> $MEAL mint address</div>
+          <div><strong>Final gate:</strong> minimum $MEAL holder balance</div>
+        </div>
+        <br />
+        <button class="action-btn" id="lockedConnectBtn">CONNECT ALLOWLISTED WALLET</button>
+        <div id="lockedAccessResult" style="margin-top:12px;"></div>
+      </div>
+    `;
+  }
+
+  function normalizeDrops(dropList) {
+    const counts = Object.create(null);
+    for (const d of dropList || []) {
+      const item = typeof d === "string" ? d : d?.item;
+      const qty = typeof d === "string" ? 1 : Number(d?.qty || 1);
+      if (!item) continue;
+      counts[item] = (counts[item] || 0) + Math.max(1, Math.min(qty, 25));
+    }
+    return Object.entries(counts).map(([item, qty]) => ({ item, qty }));
+  }
+
   function loadState() {
     const raw = localStorage.getItem("mcmeal_hub_launch_v2_street");
     const defaults = {
@@ -199,8 +324,8 @@
   function update(dt) {
     if (modalOpen) return;
 
-    let dx = 0;
-    let dy = 0;
+    let dx = mobileStick.dx || 0;
+    let dy = mobileStick.dy || 0;
     if (keys.ArrowLeft || keys.a) dx -= 1;
     if (keys.ArrowRight || keys.d) dx += 1;
     if (keys.ArrowUp || keys.w) dy -= 1;
@@ -301,15 +426,15 @@
   }
 
   function drawHeader() {
-    drawPixelText("MC MEAL KITCHEN STREET", 26, 32, 27, C.gold, "#74311f");
+    drawPixelText("MC MEAL SEASON 0", 26, 32, 27, C.gold, "#74311f");
 
     ctx.fillStyle = C.cream;
     ctx.font = "15px Courier New";
-    ctx.fillText("Walk around. ENTER opens a building.", 575, 31);
+    ctx.fillText("Live Kitchen · ENTER opens a building.", 575, 31);
 
-    ctx.fillStyle = C.green;
+    ctx.fillStyle = state.backendSynced ? C.green : C.gold;
     ctx.font = "13px Courier New";
-    ctx.fillText("Play → Collect → Craft → Sell → Repeat", 575, 54);
+    ctx.fillText(state.backendSynced ? "Backend synced · Wallet-linked economy" : "Connect wallet to sync profile", 575, 54);
   }
 
   function drawStreet() {
@@ -564,6 +689,9 @@
     ctx.fillText(`Burned ${state.burned}`, 238, y);
     ctx.fillText(`Runs ${state.miniRuns}`, 380, y);
     ctx.fillText(`Meals ${state.mealsCrafted}`, 475, y);
+    ctx.fillText(`${state.wallet ? shortWallet(state.wallet) : "Wallet: Connect"}`, 600, y);
+    ctx.fillStyle = state.backendSynced ? C.green : C.gold;
+    ctx.fillText(state.backendSynced ? "LIVE SYNC" : "LOCAL VIEW", 810, y);
   }
 
   function drawPixelText(text, x, y, size, color, shadow) {
@@ -595,40 +723,76 @@
     lastTime = t;
     update(dt);
     draw();
-  
-  function setupStartScreen() {
-    const start = document.getElementById("startScreen");
-    const enter = document.getElementById("enterKitchenBtn");
-    const how = document.getElementById("howItWorksBtn");
-    const howBox = document.getElementById("howItWorksBox");
-
-    if (enter && start) {
-      enter.addEventListener("click", () => {
-        start.classList.add("hidden");
-      });
-    }
-
-    if (how && howBox) {
-      how.addEventListener("click", () => {
-        howBox.classList.toggle("hidden");
-      });
-    }
-
-    window.addEventListener("keydown", e => {
-      if (!start || start.classList.contains("hidden")) return;
-      if (e.key === "Enter") start.classList.add("hidden");
-    });
+    requestAnimationFrame(loop);
   }
 
+  function setupMobileJoystick() {
+    const area = document.getElementById("mobileStickArea");
+    const knob = document.getElementById("mobileStickKnob");
+    if (!area || !knob) return;
 
-  setupStartScreen();
-  requestAnimationFrame(loop);
+    function resetStick() {
+      mobileStick.active = false;
+      mobileStick.pointerId = null;
+      mobileStick.dx = 0;
+      mobileStick.dy = 0;
+      knob.style.transform = "translate(0px, 0px)";
+    }
+
+    function updateStick(e) {
+      const rect = area.querySelector(".mobile-stick-base").getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      let px = e.clientX - centerX;
+      let py = e.clientY - centerY;
+      const dist = Math.hypot(px, py);
+      const max = Math.min(mobileStick.max, rect.width * 0.32);
+
+      if (dist > max) {
+        px = (px / dist) * max;
+        py = (py / dist) * max;
+      }
+
+      mobileStick.dx = px / max;
+      mobileStick.dy = py / max;
+      knob.style.transform = `translate(${px}px, ${py}px)`;
+    }
+
+    area.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      mobileStick.active = true;
+      mobileStick.pointerId = e.pointerId;
+      area.setPointerCapture(e.pointerId);
+      updateStick(e);
+    });
+
+    area.addEventListener("pointermove", e => {
+      if (!mobileStick.active || e.pointerId !== mobileStick.pointerId) return;
+      e.preventDefault();
+      updateStick(e);
+    });
+
+    area.addEventListener("pointerup", e => {
+      if (e.pointerId === mobileStick.pointerId) resetStick();
+    });
+
+    area.addEventListener("pointercancel", resetStick);
+    area.addEventListener("lostpointercapture", resetStick);
   }
 
   function openStation(id) {
     modalOpen = true;
     const station = stations.find(s => s.id === id);
     setModalHeader(station.name, station.subtitle);
+
+    if (id !== "launch" && !hasPrivateAccess()) {
+      setModalHeader("ACCESS LOCKED", "Private test access required");
+      setContent(lockedAccessHtml());
+      document.getElementById("modal").classList.remove("hidden");
+      const lockedBtn = document.getElementById("lockedConnectBtn");
+      if (lockedBtn) lockedBtn.addEventListener("click", () => connectWalletAndSync(document.getElementById("lockedAccessResult"), false));
+      return;
+    }
 
     if (id === "arcade") renderArcadeModal();
     else if (id === "craft") renderCraftModal();
@@ -683,7 +847,7 @@
       <div class="modal-grid">
         ${games.map(g => `
           <div class="modal-panel">
-            <div class="alpha-badge">REAL APPROVED GAME</div>
+            <div class="season-badge">REAL APPROVED GAME</div>
             <h3>${g.icon} ${g.name}</h3>
             <p>${g.subtitle}. Opens the exact approved standalone build inside the Hub.</p>
             <button class="action-btn" data-real-game="${g.src}" data-game-name="${g.name}">PLAY REAL GAME</button>
@@ -693,7 +857,7 @@
 
       <div class="modal-panel">
         <h3>Connected Rewards</h3>
-        <p>These are not the simplified demo modules. These are the approved real mini-games. When a run reaches the result screen, rewards are sent back into the shared Hub profile.</p>
+        <p>These are the approved real mini-games. When a run reaches the result screen, rewards are submitted to the backend profile.</p>
       </div>
     `);
 
@@ -703,12 +867,12 @@
   }
 
   function openRealGame(src, gameName) {
-    setModalHeader(gameName, "Real approved mini-game · rewards connect back to Hub");
+    setModalHeader(gameName, "Real mini-game · rewards save to backend");
 
     setContent(`
       <div class="real-game-wrap">
         <div class="game-launch-note" id="realGameRewardNote">
-          <strong>${gameName}</strong> is running inside MC Meal Hub. Play until the result screen. Rewards will save automatically.
+          <strong>${gameName}</strong> is running inside MC Meal Hub. Play until the result screen. Rewards save to your backend profile after wallet connect.
         </div>
 
         <iframe class="real-game-frame" src="${src}" title="${gameName}" scrolling="no"></iframe>
@@ -725,36 +889,48 @@
     document.getElementById("openGameNewTab").addEventListener("click", () => window.open(src, "_blank"));
   }
 
-  function applyRealGameReward(payload) {
+  async function applyRealGameReward(payload) {
     if (!payload || payload.type !== "MCMEAL_GAME_RESULT") return;
 
-    const rewards = payload.rewards || {};
-    const drops = Array.isArray(rewards.drops) ? rewards.drops.slice() : [];
+    const note = document.getElementById("realGameRewardNote");
 
-    if (rewards.gotTicket) drops.push("Mystery Ticket");
-    if (rewards.gotFragment) drops.push("Recipe Fragment");
-
-    const dropObjects = drops.map(item => ({ item, qty: 1 }));
-    const score = Number(payload.score || 0);
-    const xp = Number(rewards.xp || 0);
-
-    if (window.MCMealSave) {
-      state = window.MCMealSave.submitRun(state, payload.game || "Mini Game", score, dropObjects);
-      state.xp += xp;
-      if (payload.levelsCleared) state.lastLevelsCleared = payload.levelsCleared;
-      saveState();
-    } else {
-      state.miniRuns += 1;
-      state.bestScore = Math.max(state.bestScore || 0, score);
-      state.xp += xp;
-      for (const d of dropObjects) give(d.item, d.qty);
-      addLog(`${payload.game}: rewards saved.`);
-      saveState();
+    if (!requireWallet("game rewards")) {
+      if (note) note.innerHTML = `<strong>Wallet required:</strong> Connect Phantom in the Launch building, then play again to save rewards on the backend.`;
+      renderArcadeModal();
+      return;
     }
 
-    const note = document.getElementById("realGameRewardNote");
-    if (note) {
-      note.innerHTML = `<strong>Rewards saved:</strong> ${payload.game || "Mini Game"} · Score ${score} · +${xp} XP · ${dropObjects.length ? dropObjects.map(d => d.item).join(", ") : "No item drops"}`;
+    const rewards = payload.rewards || {};
+    const rawDrops = Array.isArray(rewards.drops) ? rewards.drops.slice() : [];
+
+    if (rewards.gotTicket) rawDrops.push("Mystery Ticket");
+    if (rewards.gotFragment) rawDrops.push("Recipe Fragment");
+
+    const dropObjects = normalizeDrops(rawDrops);
+    const score = Number(payload.score || 0);
+    const gameKey = payload.game || "Mini Game";
+    const clientRunId = `${gameKey.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    try {
+      const result = await backendCall(BACKEND.endpoints.submitRun, {
+        walletAddress: state.wallet,
+        gameKey,
+        score,
+        durationMs: Number(payload.durationMs || 0),
+        clientRunId,
+        drops: dropObjects
+      });
+
+      syncBackendState(result);
+      addLog(`${gameKey}: backend saved score ${result.score}, +${result.xpEarned} XP.`);
+
+      if (note) {
+        note.innerHTML = `<strong>Backend saved:</strong> ${gameKey} · Score ${result.score} · +${result.xpEarned} XP · ${result.drops.length ? result.drops.map(d => `${d.item} x${d.qty}`).join(", ") : "No item drops"}`;
+      }
+    } catch (err) {
+      const msg = err?.message || "submit_failed";
+      addLog(`${gameKey}: backend save failed (${msg}).`);
+      if (note) note.innerHTML = `<strong>Backend save failed:</strong> ${msg}`;
     }
   }
 
@@ -939,48 +1115,26 @@
     state.inventory[item] = (state.inventory[item] || 0) + qty;
   }
 
-  function craft(type) {
-    if (type === "basic") {
-      const req = [["Bun",1],["Patty",1],["Cheese",1],["Lettuce",1],["Sauce",1]];
-      if (!req.every(([i,q]) => has(i,q))) return addLog("Craft failed: missing Basic Burger ingredients."), renderCraftModal();
-      req.forEach(([i,q]) => take(i,q));
-      give("Basic Burger");
-      state.mealsCrafted += 1;
-      state.xp += 25;
-      addLog("Crafted Basic Burger. +25 XP.");
+  async function craft(type) {
+    if (!requireWallet("crafting")) {
+      renderCraftModal();
+      return;
     }
 
-    if (type === "classic") {
-      const req = [["Basic Burger",1],["Fries",1],["Soda",1]];
-      if (state.meal < 100 || !req.every(([i,q]) => has(i,q))) return addLog("Craft failed: missing Classic MC Meal requirements."), renderCraftModal();
-      req.forEach(([i,q]) => take(i,q));
-      spendMeal(100, 0.8);
-      give("Classic MC Meal");
-      state.mealsCrafted += 1;
-      state.xp += 60;
-      addLog("Crafted Classic MC Meal. 80 $MEAL burned, 20 to pool. +60 XP.");
+    try {
+      const result = await backendCall(BACKEND.endpoints.craft, {
+        walletAddress: state.wallet,
+        recipeId: type
+      });
+      syncBackendState(result);
+      addLog(`Crafted ${result.recipeName} → ${result.resultItem}. +${result.xpEarned} XP.`);
+    } catch (err) {
+      const msg = err?.message || "craft_failed";
+      if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
+      else if (msg === "not_enough_meal") addLog("Craft failed: not enough $MEAL.");
+      else addLog(`Craft failed: ${msg}.`);
     }
 
-    if (type === "mystery") {
-      const req = [["Bun",1],["Patty",1],["Cheese",1],["Fries",1],["Soda",1],["Sauce",1],["Mystery Ticket",1]];
-      if (state.meal < 500 || !req.every(([i,q]) => has(i,q))) return addLog("Craft failed: missing Mystery Meal requirements."), renderCraftModal();
-      req.forEach(([i,q]) => take(i,q));
-      spendMeal(500, 0.9);
-      const result = roll([
-        ["Kitchen Scrap", 40],
-        ["Common Meal", 35],
-        ["Rare Meal", 18],
-        ["Supreme Meal", 5.5],
-        ["Legendary Meal", 1.25],
-        ["Golden Meal", 0.25]
-      ]);
-      give(result);
-      state.mealsCrafted += 1;
-      state.xp += 120;
-      addLog(`Mystery Meal crafted → ${result}. 450 $MEAL burned, 50 to pool. +120 XP.`);
-    }
-
-    saveState();
     renderCraftModal();
   }
 
@@ -1028,9 +1182,9 @@
 
     const buyHtml = `
       <div class="modal-panel">
-        <div class="alpha-badge">DEMO SHOP</div>
+        <div class="season-badge">LIVE SHOP</div>
         <h3>Buy Materials</h3>
-        <p>Use demo $MEAL to buy missing materials. 80% burn / 20% craft pool is displayed immediately.</p>
+        <p>Use Season 0 $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
         <div class="action-list">
           ${shop.map(([label,item,qty,price,note]) => `
             <div class="action-row">
@@ -1045,9 +1199,9 @@
 
     const sellHtml = `
       <div class="modal-panel">
-        <div class="alpha-badge">DEMO SELL COUNTER</div>
+        <div class="season-badge">LIVE SELL COUNTER</div>
         <h3>Sell Crafted Meals</h3>
-        <p>Sell crafted meals back to the Kitchen Buyer for demo $MEAL. Real payouts need backend protection.</p>
+        <p>Sell crafted meals back to the Kitchen Buyer. Actions are saved on the backend.</p>
         <div class="action-list">
           ${sell.map(([item, price, note]) => `
             <div class="action-row">
@@ -1062,9 +1216,9 @@
 
     const marketHtml = `
       <div class="modal-panel">
-        <div class="alpha-badge">REAL MARKET PLAN</div>
+        <div class="season-badge">TOKEN SETTLEMENT NEXT</div>
         <h3>Market Logic</h3>
-        <p>This is the exact flow before we activate real transactions.</p>
+        <p>Season 0 is backend-synced now. Real token settlement activates after wallet signatures and transaction checks.</p>
         <div class="roadmap">
           <div><strong>Buy real:</strong> wallet signs $MEAL payment → backend verifies tx → item delivered</div>
           <div><strong>Sell real:</strong> backend removes meal → creates payout or claim credit</div>
@@ -1085,12 +1239,12 @@
         <div class="modal-panel">
           <h3>Shop Balance</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Demo $MEAL</strong><span>Preview balance</span></div><strong>${state.meal}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Preview burn counter</span></div><strong>${state.burned}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>$MEAL Balance</strong><span>Season 0 backend balance</span></div><strong>${state.meal}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
           <br />
-          <div class="station-status"><strong>Alpha rule:</strong> Shop is playable with demo economy. Real $MEAL settlement only after backend verification.</div>
+          <div class="station-status"><strong>Season 0:</strong> Shop actions are backend-synced. Real $MEAL settlement comes after wallet signatures and tx checks.</div>
         </div>
         ${activeTab === "buy" ? buyHtml : activeTab === "sell" ? sellHtml : marketHtml}
       </div>
@@ -1101,33 +1255,39 @@
     });
 
     document.querySelectorAll("[data-buy]").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const item = btn.dataset.buy;
-        const qty = Number(btn.dataset.qty);
-        const price = Number(btn.dataset.price);
-        if (window.MCMealSave) {
-          window.MCMealSave.buyFromShop(state, item, qty, price);
-          saveState();
-        } else if (state.meal >= price) {
-          spendMeal(price, 0.8);
-          give(item, qty);
-          addLog(`Bought ${qty}x ${item}.`);
+        if (!requireWallet("shop buys")) return renderShopModal("buy");
+        try {
+          const result = await backendCall(BACKEND.endpoints.shopBuy, {
+            walletAddress: state.wallet,
+            shopItemId: SHOP_ITEM_IDS[item]
+          });
+          syncBackendState(result);
+          addLog(`Bought ${result.qty}x ${result.item}. ${result.burned} $MEAL burned, ${result.pool} to pool.`);
+        } catch (err) {
+          const msg = err?.message || "shop_buy_failed";
+          addLog(msg === "not_enough_meal" ? `Shop buy failed: not enough $MEAL for ${item}.` : `Shop buy failed: ${msg}.`);
         }
         renderShopModal("buy");
       });
     });
 
     document.querySelectorAll("[data-sell]").forEach(btn => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const item = btn.dataset.sell;
-        const price = Number(btn.dataset.price);
-        if (window.MCMealSave) {
-          window.MCMealSave.sellToShop(state, item, 1, price);
-          saveState();
-        } else if (has(item, 1)) {
-          take(item, 1);
-          state.meal += price;
-          addLog(`Sold ${item} for ${price} $MEAL.`);
+        if (!requireWallet("shop sells")) return renderShopModal("sell");
+        try {
+          const result = await backendCall(BACKEND.endpoints.shopSell, {
+            walletAddress: state.wallet,
+            itemName: item,
+            qty: 1
+          });
+          syncBackendState(result);
+          addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
+        } catch (err) {
+          const msg = err?.message || "shop_sell_failed";
+          addLog(msg === "missing_item" ? `Sell failed: missing ${item}.` : `Sell failed: ${msg}.`);
         }
         renderShopModal("sell");
       });
@@ -1172,21 +1332,21 @@
     setContent(`
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Local Kitchen Stats</h3>
+          <h3>Live Kitchen Stats</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Total local progress</span></div><strong>${state.xp}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best simulated run</span></div><strong>${state.bestScore}</strong></div>
+            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${state.xp}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${state.bestScore}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>$MEAL Burned</strong><span>Shop/craft burn</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Meals Crafted</strong><span>Total crafted meals</span></div><strong>${state.mealsCrafted}</strong></div>
           </div>
         </div>
         <div class="modal-panel">
-          <h3>Future Backend Leaderboards</h3>
+          <h3>Season Leaderboards Next</h3>
           <div class="roadmap">
-            <div>Daily high score per mini-game</div>
-            <div>Most $MEAL burned this season</div>
-            <div>Most Mystery Meals crafted</div>
-            <div>Golden Meal holders / crafters</div>
+            <div>Daily high score per mini-game: next leaderboard view</div>
+            <div>Most $MEAL burned this season: tracked now</div>
+            <div>Most Mystery Meals crafted: tracked now</div>
+            <div>Golden Meal holders / crafters: tracked now</div>
           </div>
         </div>
       </div>
@@ -1204,14 +1364,14 @@
     setContent(`
       <div class="modal-grid">
         <div class="modal-panel">
-          <div class="alpha-badge">DAILY RETENTION LOOP</div>
+          <div class="season-badge">LIVE DAILY LOOP</div>
           <h3>🔥 Daily Kitchen Claim</h3>
-          <p>Come back daily, build a streak, collect ingredients and unlock better craft chances. Backend version will be one claim per wallet per server day.</p>
+          <p>Come back daily, build a server-side streak, collect ingredients and unlock better craft chances. One claim per wallet per server day.</p>
 
           <div class="item-list">
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Current Streak</strong><span>Consecutive claims</span></div><strong>${current}</strong></div>
             <div class="item-row"><div class="pixel-icon">📅</div><div><strong>Today</strong><span>${already ? "Claim already used" : "Claim available"}</span></div><strong>${already ? "DONE" : "READY"}</strong></div>
-            <div class="item-row"><div class="pixel-icon">✅</div><div><strong>Total Claims</strong><span>Lifetime preview claims</span></div><strong>${total}</strong></div>
+            <div class="item-row"><div class="pixel-icon">✅</div><div><strong>Total Claims</strong><span>Lifetime server claims</span></div><strong>${total}</strong></div>
           </div>
 
           <br />
@@ -1238,57 +1398,113 @@
 
     const btn = document.getElementById("claimDailyBtn");
     if (btn) {
-      btn.addEventListener("click", () => {
-        if (window.MCMealSave) {
-          const result = window.MCMealSave.claimDaily(state);
-          state = result.profile;
-          saveState();
-        } else {
-          addLog("Daily claimed.");
+      btn.addEventListener("click", async () => {
+        if (!requireWallet("daily claim")) return renderDailyModal();
+        try {
+          const result = await backendCall(BACKEND.endpoints.dailyClaim, {
+            walletAddress: state.wallet
+          });
+          syncBackendState(result);
+          addLog(`Daily claimed: streak ${result.streak}. +${result.xpEarned} XP.`);
+        } catch (err) {
+          const msg = err?.message || "daily_claim_failed";
+          addLog(msg === "already_claimed_today" ? "Daily already claimed today." : `Daily claim failed: ${msg}.`);
         }
         renderDailyModal();
       });
     }
   }
 
-  async function connectWalletReadOnly() {
-    const resultEl = document.getElementById("walletResult");
+  function accessDeniedMessage(address) {
+    return `
+      <div class="warning-box">
+        <strong>Access locked.</strong><br />
+        Wallet ${shortWallet(address)} is not on the private test allowlist yet.<br />
+        After the $MEAL pump.fun launch, this will switch to real holder access.
+      </div>
+    `;
+  }
+
+  async function connectWalletAndSync(resultEl, hideStartAfterSuccess = false) {
     try {
       if (!window.solana || !window.solana.isPhantom) {
-        resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
-        return;
+        if (resultEl) resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
+        return false;
       }
+
+      if (resultEl) resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking private test access...</div>`;
 
       const resp = await window.solana.connect({ onlyIfTrusted: false });
       const address = resp.publicKey.toString();
+
+      const access = await backendCall(BACKEND.endpoints.checkAccess, {
+        walletAddress: address
+      });
+
+      if (!access.allowed) {
+        state.wallet = null;
+        state.prelaunchAccess = false;
+        state.backendSynced = false;
+        saveState();
+        if (resultEl) resultEl.innerHTML = accessDeniedMessage(address);
+        return false;
+      }
+
       let balance = null;
-      let balanceText = "Balance check skipped. Add MEAL mint in config.example.json to activate RPC balance checks.";
+      let balanceText = "Private test access granted. Real $MEAL holder check activates after pump.fun launch.";
 
       try {
         balance = await fetchMealBalance(address);
-        if (balance !== null) balanceText = `$MEAL Balance found: ${balance}`;
+        if (balance !== null) balanceText = `$MEAL balance found: ${balance}`;
       } catch (e) {
-        balanceText = "Wallet connected. $MEAL balance check needs RPC/mint config.";
+        balanceText = "Private test access granted. $MEAL mint is not live yet.";
       }
 
-      if (window.MCMealSave) {
-        state = window.MCMealSave.setWallet(state, address, balance);
-        saveState();
-      } else {
-        state.wallet = address;
-        saveState();
+      state.wallet = address;
+      state.prelaunchAccess = true;
+      saveState();
+
+      const profile = await backendCall(BACKEND.endpoints.profileConnect, {
+        walletAddress: address,
+        mealBalance: balance !== null ? balance : 10000
+      });
+      syncBackendState(profile);
+      state.prelaunchAccess = true;
+      saveState();
+
+      if (resultEl) {
+        resultEl.innerHTML = `
+          <div class="wallet-card">
+            <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
+            <div class="wallet-row"><span>Access</span><strong>Private Test Access</strong></div>
+            <div class="wallet-row"><span>Backend</span><strong>Synced</strong></div>
+            <div class="wallet-row"><span>Status</span><strong>${balanceText}</strong></div>
+          </div>
+        `;
       }
 
-      resultEl.innerHTML = `
-        <div class="wallet-card">
-          <div class="wallet-row"><span>Wallet</span><strong>${address.slice(0, 6)}...${address.slice(-6)}</strong></div>
-          <div class="wallet-row"><span>Access Tier</span><strong>${state.accessTier || "Visitor"}</strong></div>
-          <div class="wallet-row"><span>Read-only Status</span><strong>${balanceText}</strong></div>
-        </div>
-      `;
+      if (hideStartAfterSuccess) {
+        const start = document.getElementById("startScreen");
+        if (start) start.classList.add("hidden");
+      }
+
+      addLog(`Wallet synced: ${shortWallet(address)}.`);
+      return true;
     } catch (err) {
-      resultEl.innerHTML = `<div class="warning-box">Wallet connection cancelled or failed.</div>`;
+      const msg = err?.message || "wallet_connection_failed";
+      if (resultEl) {
+        if (msg === "access_locked_prelaunch" || err?.status === 403) {
+          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet is not allowlisted for private testing.</div>`;
+        } else {
+          resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${msg}</div>`;
+        }
+      }
+      return false;
     }
+  }
+
+  async function connectWalletReadOnly() {
+    await connectWalletAndSync(document.getElementById("walletResult"), false);
   }
 
   async function fetchMealBalance(walletAddress) {
@@ -1341,20 +1557,20 @@
 
     setContent(`
       <div class="big-cta">
-        <div>MC MEAL LAUNCH ALPHA</div>
-        <div>Real mini-games · shared inventory · craft house · shop loop · daily streak · wallet read-only</div>
+        <div>MC MEAL PRIVATE TEST</div>
+        <div>Backend-synced kitchen economy · private test access before $MEAL launch</div>
       </div>
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <div class="alpha-badge">NO SPENDING IN ALPHA</div>
-          <h3>Wallet Connect Read-Only</h3>
-          <p>Connect Phantom to prepare wallet identity and $MEAL tier display. This alpha does not send transactions.</p>
+          <div class="season-badge">PRIVATE TEST ACCESS</div>
+          <h3>Wallet Connect</h3>
+          <p>Connect the allowlisted Phantom wallet to open the Kitchen. Public holder access activates after the $MEAL pump.fun launch.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
             <div class="wallet-row"><span>Access Tier</span><strong>${tier}</strong></div>
-            <div class="wallet-row"><span>Transaction Mode</span><strong>Disabled / read-only</strong></div>
+            <div class="wallet-row"><span>Backend Sync</span><strong>Active after connect</strong></div>
           </div>
 
           <br />
@@ -1365,8 +1581,8 @@
         <div class="modal-panel">
           <h3>$MEAL Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Visitor</strong> Demo access</div>
-            <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
+            <div><strong>Prelaunch</strong> Allowlisted test wallet only</div>
+            <div><strong>Basic Kitchen</strong> 10,000 $MEAL after launch</div>
             <div><strong>Grill Access</strong> 50,000 $MEAL</div>
             <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
             <div><strong>Legendary Kitchen</strong> 1,000,000 $MEAL</div>
@@ -1376,22 +1592,22 @@
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Backend Next</h3>
+          <h3>Backend Live</h3>
           <div class="roadmap">
-            <div>Server wallet profile</div>
-            <div>Daily claim per wallet</div>
-            <div>Run submit API with anti-spam</div>
-            <div>Craft + shop verification</div>
+            <div>Server wallet profile: live</div>
+            <div>Daily claim per wallet: live</div>
+            <div>Run submit API with duplicate protection: live</div>
+            <div>Craft + shop verification: live</div>
           </div>
         </div>
 
         <div class="modal-panel">
           <h3>Launch Status</h3>
           <div class="roadmap">
-            <div>Hub: ready</div>
-            <div>4 real games: connected</div>
-            <div>Shared save: ready</div>
-            <div>Wallet: read-only prepared</div>
+            <div>Hub: live</div>
+            <div>4 real games: backend rewards connected</div>
+            <div>Supabase save: active</div>
+            <div>Wallet profile: active</div>
           </div>
         </div>
       </div>
@@ -1447,10 +1663,11 @@
     const enter = document.getElementById("enterKitchenBtn");
     const how = document.getElementById("howItWorksBtn");
     const howBox = document.getElementById("howItWorksBox");
+    const result = document.getElementById("accessResult");
 
     if (enter && start) {
-      enter.addEventListener("click", () => {
-        start.classList.add("hidden");
+      enter.addEventListener("click", async () => {
+        await connectWalletAndSync(result, true);
       });
     }
 
@@ -1460,13 +1677,21 @@
       });
     }
 
-    window.addEventListener("keydown", e => {
+    window.addEventListener("keydown", async e => {
       if (!start || start.classList.contains("hidden")) return;
-      if (e.key === "Enter") start.classList.add("hidden");
+      if (e.key === "Enter") {
+        e.preventDefault();
+        await connectWalletAndSync(result, true);
+      }
     });
+
+    if (hasPrivateAccess() && start) {
+      start.classList.add("hidden");
+    }
   }
 
 
+  setupMobileJoystick();
   setupStartScreen();
   requestAnimationFrame(loop);
 })();
