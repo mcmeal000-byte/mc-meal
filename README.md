@@ -60,3 +60,24 @@ Secret Receipt is visible as COMING SOON and disabled in the shop. index.html us
 - Mystery Meal Attempts: max 3 per wallet per day.
 - Daily Claim: 1 per wallet per day.
 - Mystery odds unchanged: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.
+
+
+## Fry Rush Balance v6
+
+Fry Rush was made harder before go-live:
+- Lives reduced to 3.
+- Tray gets smaller across levels.
+- Spawn speed and falling speed increased.
+- Bad item rate increased on higher levels.
+- Missing 3 good orders costs 1 life.
+- Level goals increased so Fry Rush is no longer the easiest farming route.
+
+
+## Final UI clean v7
+
+Removed public-facing test/prelaunch/season wording from the interface:
+- Private Test Kitchen -> Kitchen Economy
+- Private Test Access -> Kitchen Access
+- Solana $MEAL Prelaunch -> Solana $MEAL
+- Launch/Access modals now use final wallet / holder access language
+- Arcade/Craft/Shop/Daily copy cleaned for final surface

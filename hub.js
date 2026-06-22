@@ -1,4 +1,4 @@
-// MC Meal Live Fix v4.1 250 MEAL - arcade gating + close buttons + layout polish
+// MC Meal Live Fix v7 Final UI - arcade gating + close buttons + layout polish
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -238,23 +238,23 @@
 
   function requireWallet(actionLabel = "this action") {
     if (hasPrivateAccess()) return true;
-    addLog(`Private test access required to use ${actionLabel}. Connect your allowlisted Phantom wallet first.`);
+    addLog(`Kitchen access required to use ${actionLabel}. Connect your Phantom wallet first.`);
     return false;
   }
 
   function lockedAccessHtml() {
     return `
       <div class="modal-panel">
-        <div class="season-badge">PRIVATE TEST LOCKED</div>
-        <h3>Access locked before $MEAL launch</h3>
-        <p>The Kitchen is currently open only for allowlisted test wallets. After the pump.fun launch, this gate will switch to real $MEAL holder access.</p>
+        <div class="season-badge">KITCHEN ACCESS LOCKED</div>
+        <h3>Connect wallet to enter the Kitchen</h3>
+        <p>The Kitchen uses wallet access. Connect Phantom to sync your profile, runs, rewards and crafting.</p>
         <div class="roadmap">
-          <div><strong>Allowed now:</strong> private test wallets only</div>
-          <div><strong>Next:</strong> $MEAL mint address</div>
-          <div><strong>Final gate:</strong> minimum $MEAL holder balance</div>
+          <div><strong>Access:</strong> wallet required</div>
+          <div><strong>Token:</strong> $MEAL economy</div>
+          <div><strong>Holder gate:</strong> minimum $MEAL balance</div>
         </div>
         <br />
-        <button class="action-btn" id="lockedConnectBtn">CONNECT ALLOWLISTED WALLET</button>
+        <button class="action-btn" id="lockedConnectBtn">CONNECT WALLET</button>
         <div id="lockedAccessResult" style="margin-top:12px;"></div>
       </div>
     `;
@@ -467,7 +467,7 @@
   }
 
   function drawHeader() {
-    drawPixelText("MC MEAL SEASON 0", 26, 32, 27, C.gold, "#74311f");
+    drawPixelText("MC MEAL", 26, 32, 27, C.gold, "#74311f");
 
     ctx.fillStyle = C.cream;
     ctx.font = "15px Courier New";
@@ -827,7 +827,7 @@
     setModalHeader(station.name, station.subtitle);
 
     if (id !== "launch" && !hasPrivateAccess()) {
-      setModalHeader("ACCESS LOCKED", "Private test access required");
+      setModalHeader("ACCESS LOCKED", "Wallet access required");
       setContent(lockedAccessHtml());
       document.getElementById("modal").classList.remove("hidden");
       const lockedBtn = document.getElementById("lockedConnectBtn");
@@ -886,14 +886,14 @@
 
     const noticeHtml = extraMessage ? `
       <div class="modal-panel" style="border-color:#52f0cf;">
-        <div class="season-badge">ARCADE NOTICE</div>
+        <div class="season-badge">KITCHEN NOTICE</div>
         <p>${extraMessage}</p>
       </div>
     ` : "";
 
     setContent(`
       <div class="modal-panel">
-        <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
+        <div class="season-badge">RUN ECONOMY</div>
         <h3>Daily Rewarded Runs</h3>
         <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Extra rewarded runs are capped at <strong>20 per wallet/day</strong> to protect the kitchen economy.</p>
       </div>
@@ -955,7 +955,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-fix-v5-limits" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-fix-v7-final-ui" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -967,7 +967,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v5-limits`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v7-final-ui`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1281,9 +1281,9 @@
 
     const buyHtml = `
       <div class="modal-panel">
-        <div class="season-badge">LIVE SHOP</div>
+        <div class="season-badge">KITCHEN SHOP</div>
         <h3>Buy Materials</h3>
-        <p>Use Season 0 $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
+        <p>Use $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
         <div class="action-list">
           ${shop.map(([label,item,qty,price,note,locked]) => `
             <div class="action-row ${locked ? "locked-row" : ""}">
@@ -1298,7 +1298,7 @@
 
     const sellHtml = `
       <div class="modal-panel">
-        <div class="season-badge">LIVE SELL COUNTER</div>
+        <div class="season-badge">SELL COUNTER</div>
         <h3>Sell Crafted Meals</h3>
         <p>Sell crafted meals back to the Kitchen Buyer. Actions are saved on the backend.</p>
         <div class="action-list">
@@ -1315,9 +1315,9 @@
 
     const marketHtml = `
       <div class="modal-panel">
-        <div class="season-badge">TOKEN SETTLEMENT NEXT</div>
+        <div class="season-badge">TOKEN SETTLEMENT</div>
         <h3>Market Logic</h3>
-        <p>Season 0 is backend-synced now. Real token settlement activates after wallet signatures and transaction checks.</p>
+        <p>$MEAL actions are backend-synced. Real token settlement activates with wallet signatures and transaction checks.</p>
         <div class="roadmap">
           <div><strong>Buy real:</strong> wallet signs $MEAL payment → backend verifies tx → item delivered</div>
           <div><strong>Sell real:</strong> backend removes meal → creates payout or claim credit</div>
@@ -1338,12 +1338,12 @@
         <div class="modal-panel">
           <h3>Shop Balance</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>$MEAL Balance</strong><span>Season 0 backend balance</span></div><strong>${state.meal}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>$MEAL Balance</strong><span>$MEAL kitchen balance</span></div><strong>${state.meal}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
           <br />
-          <div class="station-status"><strong>Season 0:</strong> Shop actions are backend-synced. Real $MEAL settlement comes after wallet signatures and tx checks.</div>
+          <div class="station-status"><strong>Kitchen:</strong> Shop actions are backend-synced. Real $MEAL settlement comes after wallet signatures and tx checks.</div>
         </div>
         ${activeTab === "buy" ? buyHtml : activeTab === "sell" ? sellHtml : marketHtml}
       </div>
@@ -1426,7 +1426,7 @@
             <div><strong>Common Meal</strong> · sell, use, upgrade to Rare.</div>
             <div><strong>Rare Meal</strong> · stronger sell value and upgrade path.</div>
             <div><strong>Supreme / Legendary</strong> · premium value layer.</div>
-            <div><strong>Golden Meal</strong> · final chase item for seasons/onchain later.</div>
+            <div><strong>Golden Meal</strong> · final chase item for the MC Meal economy.</div>
           </div>
         </div>
       </div>
@@ -1446,12 +1446,12 @@
           </div>
         </div>
         <div class="modal-panel">
-          <h3>Season Leaderboards Next</h3>
+          <h3>Kitchen Leaderboards</h3>
           <div class="roadmap">
             <div>Daily high score per mini-game: next leaderboard view</div>
-            <div>Most $MEAL burned this season: tracked now</div>
+            <div>Most $MEAL burned: tracked</div>
             <div>Most Mystery Meals crafted: tracked now</div>
-            <div>Golden Meal holders / crafters: tracked now</div>
+            <div>Golden Meal holders / crafters: tracked</div>
           </div>
         </div>
       </div>
@@ -1469,7 +1469,7 @@
     setContent(`
       <div class="modal-grid">
         <div class="modal-panel">
-          <div class="season-badge">LIVE DAILY LOOP</div>
+          <div class="season-badge">DAILY KITCHEN LOOP</div>
           <h3>🔥 Daily Kitchen Claim</h3>
           <p>Come back daily, build a server-side streak, collect ingredients and unlock better craft chances. One claim per wallet per server day.</p>
 
@@ -1524,8 +1524,8 @@
     return `
       <div class="warning-box">
         <strong>Access locked.</strong><br />
-        Wallet ${shortWallet(address)} is not on the private test allowlist yet.<br />
-        After the $MEAL pump.fun launch, this will switch to real holder access.
+        Wallet ${shortWallet(address)} does not have Kitchen access yet.<br />
+        Holder access will unlock through $MEAL.
       </div>
     `;
   }
@@ -1537,7 +1537,7 @@
         return false;
       }
 
-      if (resultEl) resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking private test access...</div>`;
+      if (resultEl) resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking Kitchen access...</div>`;
 
       const resp = await window.solana.connect({ onlyIfTrusted: false });
       const address = resp.publicKey.toString();
@@ -1556,13 +1556,13 @@
       }
 
       let balance = null;
-      let balanceText = "Private test access granted. Real $MEAL holder check activates after pump.fun launch.";
+      let balanceText = "Kitchen access granted. $MEAL holder check will activate for public access.";
 
       try {
         balance = await fetchMealBalance(address);
         if (balance !== null) balanceText = `$MEAL balance found: ${balance}`;
       } catch (e) {
-        balanceText = "Private test access granted. $MEAL mint is not live yet.";
+        balanceText = "Kitchen access granted. $MEAL economy is ready for holder access.";
       }
 
       state.wallet = address;
@@ -1581,7 +1581,7 @@
         resultEl.innerHTML = `
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
-            <div class="wallet-row"><span>Access</span><strong>Private Test Access</strong></div>
+            <div class="wallet-row"><span>Access</span><strong>Kitchen Access</strong></div>
             <div class="wallet-row"><span>Backend</span><strong>Synced</strong></div>
             <div class="wallet-row"><span>Status</span><strong>${balanceText}</strong></div>
           </div>
@@ -1599,7 +1599,7 @@
       const msg = err?.message || "wallet_connection_failed";
       if (resultEl) {
         if (msg === "access_locked_prelaunch" || err?.status === 403) {
-          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet is not allowlisted for private testing.</div>`;
+          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet does not have Kitchen access yet.</div>`;
         } else {
           resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${msg}</div>`;
         }
@@ -1662,15 +1662,15 @@
 
     setContent(`
       <div class="big-cta">
-        <div>MC MEAL PRIVATE TEST</div>
-        <div>Backend-synced kitchen economy · private test access before $MEAL launch</div>
+        <div>MC MEAL KITCHEN</div>
+        <div>Backend-synced kitchen economy · $MEAL holder access ready</div>
       </div>
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <div class="season-badge">PRIVATE TEST ACCESS</div>
+          <div class="season-badge">KITCHEN ACCESS</div>
           <h3>Wallet Connect</h3>
-          <p>Connect the allowlisted Phantom wallet to open the Kitchen. Public holder access activates after the $MEAL pump.fun launch.</p>
+          <p>Connect Phantom to open the Kitchen. $MEAL holder access powers the full game economy.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
@@ -1686,8 +1686,8 @@
         <div class="modal-panel">
           <h3>$MEAL Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Prelaunch</strong> Allowlisted test wallet only</div>
-            <div><strong>Basic Kitchen</strong> 10,000 $MEAL after launch</div>
+            <div><strong>Access</strong> Wallet required</div>
+            <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
             <div><strong>Grill Access</strong> 50,000 $MEAL</div>
             <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
             <div><strong>Legendary Kitchen</strong> 1,000,000 $MEAL</div>
@@ -1707,7 +1707,7 @@
         </div>
 
         <div class="modal-panel">
-          <h3>Launch Status</h3>
+          <h3>Kitchen Status</h3>
           <div class="roadmap">
             <div>Hub: live</div>
             <div>4 real games: backend rewards connected</div>
