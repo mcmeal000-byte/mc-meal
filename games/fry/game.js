@@ -5,13 +5,18 @@ const W=c.width,H=c.height;
 const C={bg:"#171923",wallA:"#1d1821",wallB:"#221b25",floor:"#f0a63a",floorDark:"#8b4a22",text:"#fff3d0",meal:"#ffce4a",green:"#67e89a",red:"#e95d45",black:"#0d0f14",white:"#fff8df",fry:"#f4c34f",fryDark:"#b86b20",sauce:"#e45345",gold:"#ffd34d",bad:"#4b3328",cyan:"#52f0cf"};
 const keys=Object.create(null);
 const LV=[
- {name:"LEVEL 1",order:"FRY STARTER",duration:45,spawn:.82,speed:125,bad:.18,gold:.03},
- {name:"LEVEL 2",order:"SAUCE RUSH",duration:45,spawn:.68,speed:145,bad:.22,gold:.04},
- {name:"LEVEL 3",order:"DOUBLE FRY",duration:50,spawn:.55,speed:170,bad:.25,gold:.05},
- {name:"LEVEL 4",order:"NIGHT SHIFT",duration:50,spawn:.44,speed:195,bad:.30,gold:.06},
- {name:"LEVEL 5",order:"GOLDEN FRY WAR",duration:55,spawn:.34,speed:225,bad:.34,gold:.08}
+ {name:"LEVEL 1",order:"FRY STARTER",duration:38,spawn:.86,speed:118,bad:.16,gold:.03},
+ {name:"LEVEL 2",order:"SAUCE RUSH",duration:40,spawn:.72,speed:138,bad:.20,gold:.04},
+ {name:"LEVEL 3",order:"DOUBLE FRY",duration:42,spawn:.60,speed:160,bad:.23,gold:.05},
+ {name:"LEVEL 4",order:"NIGHT SHIFT",duration:44,spawn:.50,speed:182,bad:.27,gold:.06},
+ {name:"LEVEL 5",order:"GOLDEN FRY WAR",duration:46,spawn:.42,speed:205,bad:.30,gold:.08},
+ {name:"LEVEL 6",order:"COMBO COUNTER",duration:48,spawn:.38,speed:222,bad:.32,gold:.09},
+ {name:"LEVEL 7",order:"NEON FRY RUN",duration:50,spawn:.34,speed:240,bad:.34,gold:.10},
+ {name:"LEVEL 8",order:"KITCHEN STORM",duration:52,spawn:.31,speed:258,bad:.36,gold:.11},
+ {name:"LEVEL 9",order:"HOT OIL MAYHEM",duration:54,spawn:.28,speed:276,bad:.38,gold:.12},
+ {name:"LEVEL 10",order:"LEGENDARY FRY SHIFT",duration:58,spawn:.25,speed:298,bad:.40,gold:.14}
 ];
-const st={mode:"title",level:1,maxLevel:5,score:0,lives:3,combo:0,bestCombo:0,timer:45,lastTime:0,spawnTimer:0,boostCooldown:0,boostTime:0,message:"",result:null,runFinished:false,daily:getDaily()};
+const st={mode:"title",level:1,maxLevel:10,score:0,lives:3,combo:0,bestCombo:0,timer:45,lastTime:0,spawnTimer:0,boostCooldown:0,boostTime:0,message:"",result:null,runFinished:false,daily:getDaily()};
 const p={x:370,y:555,w:72,h:22,speed:310};
 const items=[];
 function getDaily(){return{today:new Date().toDateString(),last:localStorage.getItem("mcmeal_fry_last_play"),streak:Number(localStorage.getItem("mcmeal_fry_streak")||"0")}}
@@ -53,7 +58,7 @@ function draw(){bg();if(st.mode==="title"){title();return}playfield();items.forE
 function bg(){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.fillStyle="#100d12";ctx.fillRect(0,0,W,66)}
 function playfield(){ctx.fillStyle="#0e1017";ctx.fillRect(0,66,W,510);for(let y=80;y<570;y+=38)for(let x=0;x<W;x+=52){ctx.fillStyle=(x+y)%104===0?"#1b1721":"#211923";ctx.fillRect(x,y,48,34)}ctx.fillStyle=C.floor;ctx.fillRect(70,98,W-140,14);ctx.fillStyle=C.floorDark;ctx.fillRect(70,112,W-140,8);for(let x=86;x<W-80;x+=42){ctx.fillStyle="#ffd066";ctx.fillRect(x,101,20,3)}ctx.fillStyle="#090b11";ctx.fillRect(0,575,W,85);ctx.fillStyle=C.floorDark;ctx.fillRect(0,575,W,8)}
 function hud(){const d=LV[st.level-1];ctx.fillStyle="#100d12";ctx.fillRect(0,0,W,66);ctx.fillStyle=C.meal;ctx.font="22px Courier New";ctx.fillText("MC MEAL: FRY RUSH",20,26);ctx.fillStyle=C.text;ctx.font="18px Courier New";ctx.fillText(`Score ${st.score}`,20,54);ctx.fillText(`Lives ${st.lives}`,165,54);ctx.fillText(`Level ${st.level}/${st.maxLevel}`,285,54);ctx.fillText(`Time ${Math.ceil(st.timer)}s`,455,54);ctx.fillText(`Combo ${st.combo}`,610,54);if(st.message){ctx.fillStyle=C.green;ctx.font="16px Courier New";ctx.fillText(st.message,470,26)}ctx.fillStyle=C.white;ctx.font="13px Courier New";ctx.fillText(d.order,20,82)}
-function title(){txt("MC MEAL",210,140,54,C.meal,"#74311f");txt("FRY RUSH",225,215,40,C.white,"#74311f");fryBox(355,285,2.2);panel(150,385,500,150);ctx.fillStyle=C.text;ctx.font="19px Courier New";ctx.fillText("Catch fries, sauce and golden drops.",185,430);ctx.fillText("Avoid burnt food and kitchen rats.",205,462);ctx.fillText("Build combo streaks for better rewards.",185,494);ctx.fillText("Press ENTER or tap canvas to start",210,524)}
+function title(){txt("MC MEAL",210,140,54,C.meal,"#74311f");txt("FRY RUSH",225,215,40,C.white,"#74311f");fryBox(355,285,2.2);panel(150,385,500,150);ctx.fillStyle=C.text;ctx.font="19px Courier New";ctx.fillText("Catch fries, sauce and golden drops.",185,430);ctx.fillText("Avoid burnt food and kitchen rats.",205,462);ctx.fillText("10 levels of crispy indie arcade chaos.",185,494);ctx.fillText("Press ENTER or tap canvas to start",210,524)}
 function orderZone(){panel(248,590,304,58);ctx.fillStyle=C.meal;ctx.font="15px Courier New";ctx.fillText("ORDER TRAY",354,612);ctx.fillStyle=C.text;ctx.font="13px Courier New";ctx.fillText("fries + sauce + combo = better craft drops",265,636)}
 function drawPlayer(){ctx.fillStyle=st.boostTime>0?C.cyan:C.floor;ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle=C.floorDark;ctx.fillRect(p.x+6,p.y+p.h-6,p.w-12,6);ctx.fillStyle=C.white;ctx.fillRect(p.x+10,p.y+4,p.w-20,4);ctx.fillStyle="#6f351e";ctx.fillRect(p.x+p.w/2-5,p.y+p.h,10,20)}
 function drawItem(it){if(it.type==="fry")fry(it.x,it.y,1);else if(it.type==="golden"){fry(it.x,it.y,1);ctx.fillStyle=C.gold;ctx.fillRect(it.x-2,it.y-2,6,6);ctx.fillStyle=C.white;ctx.fillRect(it.x+2,it.y+2,5,3)}else if(it.type==="sauce")sauce(it.x,it.y,1);else if(it.type==="nugget")nugget(it.x,it.y,1);else if(it.type==="burnt")burnt(it.x,it.y,1);else rat(it.x,it.y,1)}

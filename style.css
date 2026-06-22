@@ -914,3 +914,11 @@ canvas {
   background: #17131a;
   cursor: not-allowed;
 }
+
+
+/* Phase A/B polish */
+.modal-panel strong { color: var(--gold); }
+.real-game-frame { box-shadow: 0 0 0 4px rgba(255,206,74,.18), 0 18px 50px rgba(0,0,0,.45); }
+.game-launch-note { border-color: rgba(82,240,207,.35); background: linear-gradient(135deg, rgba(18,20,26,.95), rgba(45,28,35,.95)); }
+.action-btn, .small-btn { transition: transform .08s ease, filter .08s ease; }
+.action-btn:hover, .small-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }

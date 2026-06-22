@@ -45,11 +45,16 @@
   ];
 
   const LEVELS = [
-    { name: "LEVEL 1", order: "CLASSIC ORDER", time: 55, goal: 3, speed: 72, spawn: 1.50, min: 3, max: 4 },
-    { name: "LEVEL 2", order: "LUNCH RUSH", time: 55, goal: 4, speed: 88, spawn: 1.25, min: 4, max: 5 },
-    { name: "LEVEL 3", order: "DELUXE BAG", time: 60, goal: 5, speed: 104, spawn: 1.05, min: 4, max: 6 },
-    { name: "LEVEL 4", order: "NIGHT COMBO", time: 60, goal: 6, speed: 122, spawn: 0.92, min: 5, max: 7 },
-    { name: "LEVEL 5", order: "SECRET MENU", time: 65, goal: 7, speed: 140, spawn: 0.82, min: 6, max: 8 }
+    { name: "LEVEL 1", order: "CLASSIC ORDER", time: 48, goal: 3, speed: 72, spawn: 1.50, min: 3, max: 4 },
+    { name: "LEVEL 2", order: "LUNCH RUSH", time: 50, goal: 4, speed: 88, spawn: 1.25, min: 4, max: 5 },
+    { name: "LEVEL 3", order: "DELUXE BAG", time: 52, goal: 5, speed: 104, spawn: 1.05, min: 4, max: 6 },
+    { name: "LEVEL 4", order: "NIGHT COMBO", time: 54, goal: 6, speed: 122, spawn: 0.92, min: 5, max: 7 },
+    { name: "LEVEL 5", order: "SECRET MENU", time: 56, goal: 7, speed: 140, spawn: 0.82, min: 6, max: 8 },
+    { name: "LEVEL 6", order: "DRIVE-THRU PANIC", time: 58, goal: 8, speed: 156, spawn: 0.74, min: 6, max: 8 },
+    { name: "LEVEL 7", order: "NEON TICKET RUSH", time: 60, goal: 9, speed: 172, spawn: 0.66, min: 7, max: 9 },
+    { name: "LEVEL 8", order: "KITCHEN MAYHEM", time: 62, goal: 10, speed: 190, spawn: 0.60, min: 7, max: 9 },
+    { name: "LEVEL 9", order: "MIDNIGHT ORDERS", time: 64, goal: 11, speed: 210, spawn: 0.55, min: 8, max: 10 },
+    { name: "LEVEL 10", order: "LEGENDARY ORDER RUSH", time: 68, goal: 12, speed: 232, spawn: 0.50, min: 8, max: 10 }
   ];
 
   const RECIPES = [

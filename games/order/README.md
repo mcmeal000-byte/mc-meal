@@ -13,4 +13,4 @@ Finalized code version of the updated Mystery Order Rush mini-game.
 - Pick conveyor ingredients in the correct order.
 - Complete customer tickets.
 - Wrong picks stay red in the tray and cost lives.
-- Clear all 5 levels.
+- Clear all 10 levels.

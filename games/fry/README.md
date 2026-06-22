@@ -10,7 +10,7 @@ Second mini-game in the MC Meal retro arcade style.
 - Space / BOOST gives a short speed boost.
 
 ## Progression
-5 levels:
+10 levels:
 1. Fry Starter
 2. Sauce Rush
 3. Double Fry

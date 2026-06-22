@@ -1,3 +1,4 @@
+// MC Meal Prelaunch Private Test v3 - Secret Receipt frontend locked + cache bust
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -155,6 +156,9 @@
       shopSell: "/shop-sell-demo"
     }
   };
+
+  const EXTRA_REWARDED_RUN_COST = 500;
+  let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
     Bun: "bun-pack",
@@ -820,62 +824,87 @@
       {
         icon: "🍔",
         name: "Burger Stack",
-        subtitle: "Approved v6 · burger building game",
+        subtitle: "10-level burger building run",
         src: "games/burger/index.html"
       },
       {
         icon: "🍟",
         name: "Fry Rush",
-        subtitle: "Approved v2 · fry catching game",
+        subtitle: "10-level crispy arcade shift",
         src: "games/fry/index.html"
       },
       {
         icon: "🥤",
         name: "Soda Sprint",
-        subtitle: "Approved easier v2 · soda filling game",
+        subtitle: "10-level fizzy pour challenge",
         src: "games/soda/index.html"
       },
       {
         icon: "🧾",
         name: "Mystery Order Rush",
-        subtitle: "Approved v3 · real hand picker",
+        subtitle: "10-level ticket chaos run",
         src: "games/order/index.html"
       }
     ];
 
     setContent(`
+      <div class="modal-panel">
+        <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
+        <h3>Daily Rewarded Runs</h3>
+        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Practice runs stay playable for holders, but do not save rewards.</p>
+      </div>
+
       <div class="modal-grid">
         ${games.map(g => `
           <div class="modal-panel">
-            <div class="season-badge">REAL APPROVED GAME</div>
+            <div class="season-badge">LEVEL 10 MINI-GAME</div>
             <h3>${g.icon} ${g.name}</h3>
-            <p>${g.subtitle}. Opens the exact approved standalone build inside the Hub.</p>
-            <button class="action-btn" data-real-game="${g.src}" data-game-name="${g.name}">PLAY REAL GAME</button>
+            <p>${g.subtitle}. Rewards are only submitted after a rewarded run.</p>
+            <div style="display:grid; gap:8px; margin-top:12px;">
+              <button class="action-btn" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="free">DAILY FREE REWARD RUN</button>
+              <button class="small-btn gold" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="paid">EXTRA REWARD RUN — ${EXTRA_REWARDED_RUN_COST} $MEAL</button>
+              <button class="small-btn" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="practice">PRACTICE — NO REWARDS</button>
+            </div>
           </div>
         `).join("")}
-      </div>
-
-      <div class="modal-panel">
-        <h3>Connected Rewards</h3>
-        <p>These are the approved real mini-games. When a run reaches the result screen, rewards are submitted to the backend profile.</p>
       </div>
     `);
 
     document.querySelectorAll("[data-real-game]").forEach(btn => {
-      btn.addEventListener("click", () => openRealGame(btn.dataset.realGame, btn.dataset.gameName));
+      btn.addEventListener("click", () => openRealGame(btn.dataset.realGame, btn.dataset.gameName, btn.dataset.runMode));
     });
   }
 
-  function openRealGame(src, gameName) {
-    setModalHeader(gameName, "Real mini-game · rewards save to backend");
+  function runModeLabel(mode) {
+    if (mode === "paid") return `Extra Reward Run · ${EXTRA_REWARDED_RUN_COST} $MEAL`;
+    if (mode === "practice") return "Practice Run · no backend rewards";
+    return "Daily Free Reward Run";
+  }
+
+  function openRealGame(src, gameName, runMode = "free") {
+    if (!requireWallet("mini-games")) return;
+
+    activeGameRun = {
+      gameName,
+      runMode,
+      startedAt: Date.now()
+    };
+
+    setModalHeader(gameName, runModeLabel(runMode));
+
+    const noteText = runMode === "practice"
+      ? "Practice mode is active. You can play freely, but this run will not submit XP or ingredients."
+      : runMode === "paid"
+        ? `Extra rewarded run active. If the result is submitted successfully, ${EXTRA_REWARDED_RUN_COST} $MEAL is charged by the backend.`
+        : "Daily free rewarded run active. If today's free run for this game is already used, the backend will reject the reward and ask for an extra run.";
 
     setContent(`
       <div class="real-game-wrap">
         <div class="game-launch-note" id="realGameRewardNote">
-          <strong>${gameName}</strong> is running inside MC Meal Hub. Play until the result screen. Rewards save to your backend profile after wallet connect.
+          <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=level10" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -893,6 +922,13 @@
     if (!payload || payload.type !== "MCMEAL_GAME_RESULT") return;
 
     const note = document.getElementById("realGameRewardNote");
+    const runInfo = activeGameRun || { runMode: "free", gameName: payload.game || "Mini Game" };
+
+    if (runInfo.runMode === "practice") {
+      addLog(`${payload.game || "Mini Game"}: practice run finished. No backend rewards submitted.`);
+      if (note) note.innerHTML = `<strong>Practice finished:</strong> Score ${Number(payload.score || 0)} · no XP or ingredient rewards saved.`;
+      return;
+    }
 
     if (!requireWallet("game rewards")) {
       if (note) note.innerHTML = `<strong>Wallet required:</strong> Connect Phantom in the Launch building, then play again to save rewards on the backend.`;
@@ -918,19 +954,23 @@
         score,
         durationMs: Number(payload.durationMs || 0),
         clientRunId,
+        runMode: runInfo.runMode === "paid" ? "paid" : "free",
+        entryCostMeal: runInfo.runMode === "paid" ? EXTRA_REWARDED_RUN_COST : 0,
         drops: dropObjects
       });
 
       syncBackendState(result);
-      addLog(`${gameKey}: backend saved score ${result.score}, +${result.xpEarned} XP.`);
+      const runTypeText = result.runType === "paid" ? `Extra run paid: ${result.entryCostMeal || EXTRA_REWARDED_RUN_COST} $MEAL` : "Daily free run used";
+      addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
 
       if (note) {
-        note.innerHTML = `<strong>Backend saved:</strong> ${gameKey} · Score ${result.score} · +${result.xpEarned} XP · ${result.drops.length ? result.drops.map(d => `${d.item} x${d.qty}`).join(", ") : "No item drops"}`;
+        note.innerHTML = `<strong>Backend saved:</strong> ${gameKey} · ${runTypeText} · Score ${result.score} · +${result.xpEarned} XP · ${result.drops.length ? result.drops.map(d => `${d.item} x${d.qty}`).join(", ") : "No item drops"}`;
       }
     } catch (err) {
       const msg = err?.message || "submit_failed";
       addLog(`${gameKey}: backend save failed (${msg}).`);
-      if (note) note.innerHTML = `<strong>Backend save failed:</strong> ${msg}`;
+      const extra = msg === "free_run_already_used" ? ` Daily free run already used. Start an Extra Reward Run for ${EXTRA_REWARDED_RUN_COST} $MEAL.` : "";
+      if (note) note.innerHTML = `<strong>Backend save failed:</strong> ${msg}.${extra}`;
     }
   }
 

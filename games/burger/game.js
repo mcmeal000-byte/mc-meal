@@ -141,6 +141,121 @@
         ["fry", 690, 3, -124]
       ]
     }
+    ,
+    {
+      title: "LEVEL 6",
+      orderName: "MIDNIGHT DOUBLE",
+      layers: ["topbun", "onion", "lettuce", "cheese", "patty", "patty2", "bottombun"],
+      placements: [
+        ["topbun", 125, 0],
+        ["onion", 570, 0],
+        ["lettuce", 250, 1],
+        ["cheese", 640, 1],
+        ["patty", 180, 2],
+        ["patty2", 520, 2],
+        ["bottombun", 355, 3]
+      ],
+      enemies: [
+        ["pickle", 115, 1, 130],
+        ["fry", 645, 1, -148],
+        ["pickle", 275, 2, 122],
+        ["fry", 530, 2, -152],
+        ["pickle", 170, 3, 126],
+        ["fry", 700, 3, -132]
+      ]
+    },
+    {
+      title: "LEVEL 7",
+      orderName: "NEON CHEESE RUSH",
+      layers: ["topbun", "cheese", "lettuce", "tomato", "cheese", "patty", "bottombun"],
+      placements: [
+        ["topbun", 520, 0],
+        ["cheese", 150, 0],
+        ["lettuce", 360, 1],
+        ["tomato", 620, 1],
+        ["cheese", 210, 2],
+        ["patty", 520, 3],
+        ["bottombun", 300, 3]
+      ],
+      enemies: [
+        ["pickle", 130, 1, 140],
+        ["fry", 650, 1, -160],
+        ["pickle", 305, 2, 136],
+        ["fry", 505, 2, -160],
+        ["pickle", 160, 3, 138],
+        ["fry", 675, 3, -144]
+      ]
+    },
+    {
+      title: "LEVEL 8",
+      orderName: "KITCHEN CHAOS",
+      layers: ["topbun", "tomato", "onion", "lettuce", "cheese", "patty", "patty2", "bottombun"],
+      placements: [
+        ["topbun", 180, 0],
+        ["tomato", 590, 0],
+        ["onion", 315, 1],
+        ["lettuce", 650, 1],
+        ["cheese", 180, 2],
+        ["patty", 480, 2],
+        ["patty2", 230, 3],
+        ["bottombun", 560, 3]
+      ],
+      enemies: [
+        ["pickle", 110, 1, 150],
+        ["fry", 670, 1, -170],
+        ["pickle", 285, 2, 146],
+        ["fry", 540, 2, -174],
+        ["pickle", 135, 3, 148],
+        ["fry", 700, 3, -152]
+      ]
+    },
+    {
+      title: "LEVEL 9",
+      orderName: "GOLDEN GRILL",
+      layers: ["topbun", "lettuce", "cheese", "tomato", "onion", "cheese", "patty", "bottombun"],
+      placements: [
+        ["topbun", 600, 0],
+        ["lettuce", 150, 0],
+        ["cheese", 380, 1],
+        ["tomato", 655, 1],
+        ["onion", 210, 2],
+        ["cheese", 520, 2],
+        ["patty", 160, 3],
+        ["bottombun", 470, 3]
+      ],
+      enemies: [
+        ["pickle", 105, 1, 160],
+        ["fry", 680, 1, -182],
+        ["pickle", 260, 2, 156],
+        ["fry", 530, 2, -184],
+        ["pickle", 150, 3, 158],
+        ["fry", 710, 3, -164]
+      ]
+    },
+    {
+      title: "LEVEL 10",
+      orderName: "LEGENDARY MC MEAL",
+      layers: ["topbun", "lettuce", "tomato", "onion", "cheese", "patty", "patty2", "bottombun"],
+      placements: [
+        ["topbun", 140, 0],
+        ["lettuce", 600, 0],
+        ["tomato", 270, 1],
+        ["onion", 520, 1],
+        ["cheese", 160, 2],
+        ["patty", 420, 2],
+        ["patty2", 660, 3],
+        ["bottombun", 300, 3]
+      ],
+      enemies: [
+        ["pickle", 100, 1, 170],
+        ["fry", 690, 1, -190],
+        ["pickle", 275, 2, 166],
+        ["fry", 535, 2, -196],
+        ["pickle", 140, 3, 168],
+        ["fry", 715, 3, -174]
+      ]
+    }
+
   ];
 
   const trayArea = {
@@ -669,8 +784,8 @@ function finishRun(won) {
     drawPanel(150, 385, 500, 150);
     ctx.fillStyle = COLORS.text;
     ctx.font = "19px Courier New";
-    ctx.fillText("5 levels with increasing difficulty", 215, 430);
-    ctx.fillText("From level 3 onward: new burger variations", 175, 462);
+    ctx.fillText("10 levels with increasing indie-kitchen chaos", 135, 430);
+    ctx.fillText("New orders, faster enemies and bigger stacks", 155, 462);
     ctx.fillText("Order name moved below the tray", 215, 494);
     ctx.fillText("Press ENTER or tap canvas to start", 210, 524);
   }

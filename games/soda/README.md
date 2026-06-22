@@ -12,7 +12,7 @@ Third mini-game in the MC Meal retro arcade style.
 
 ## Progression
 
-5 levels:
+10 levels:
 1. Classic Soda
 2. Double Pour
 3. Fizzy Rush

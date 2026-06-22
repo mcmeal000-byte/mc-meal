@@ -11,3 +11,18 @@
 
 Current mode: prelaunch_private_test.
 After $MEAL pump.fun launch, replace allowlist access with real token-holder check.
+
+## Phase A/B Test
+
+1. Run Supabase SQL: `backend/phaseA/01_daily_game_runs.sql`.
+2. Replace `submit-run` with `backend/phaseA/submit-run-level10-run-economy.ts`.
+3. Upload frontend.
+4. Connect allowlisted wallet.
+5. Start Burger Stack with Daily Free Reward Run.
+6. Finish result screen and confirm backend saved.
+7. Start Burger Stack again with Daily Free Reward Run.
+8. Expected: `free_run_already_used`.
+9. Start Burger Stack with Extra Reward Run.
+10. Expected: 500 $MEAL deducted, 400 burned, 100 reward pool.
+11. Start Practice mode.
+12. Expected: result does not submit rewards.

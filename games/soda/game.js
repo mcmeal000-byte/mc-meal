@@ -5,13 +5,18 @@ const W=c.width,H=c.height;
 const C={bg:"#171923",wallA:"#1d1821",wallB:"#221b25",floor:"#f0a63a",floorDark:"#8b4a22",text:"#fff3d0",meal:"#ffce4a",green:"#67e89a",red:"#e95d45",blue:"#36b6ff",cyan:"#52f0cf",black:"#0d0f14",white:"#fff8df",soda:"#9d4dff",foam:"#fff8df",cup:"#e9eef5",cupDark:"#9aa3ad"};
 const keys=Object.create(null);
 const LV=[
- {name:"LEVEL 1",order:"CLASSIC SODA",duration:60,cups:4,speed:56,spawn:2.15,zone:46},
- {name:"LEVEL 2",order:"DOUBLE POUR",duration:60,cups:5,speed:66,spawn:1.95,zone:42},
- {name:"LEVEL 3",order:"FIZZY RUSH",duration:65,cups:6,speed:78,spawn:1.70,zone:38},
- {name:"LEVEL 4",order:"NIGHT REFILL",duration:65,cups:7,speed:92,spawn:1.48,zone:34},
- {name:"LEVEL 5",order:"GOLDEN SODA BAR",duration:70,cups:8,speed:108,spawn:1.30,zone:30}
+ {name:"LEVEL 1",order:"CLASSIC SODA",duration:46,cups:4,speed:52,spawn:2.10,zone:48},
+ {name:"LEVEL 2",order:"DOUBLE POUR",duration:48,cups:5,speed:62,spawn:1.92,zone:44},
+ {name:"LEVEL 3",order:"FIZZY RUSH",duration:50,cups:6,speed:72,spawn:1.72,zone:40},
+ {name:"LEVEL 4",order:"NIGHT REFILL",duration:52,cups:7,speed:84,spawn:1.52,zone:36},
+ {name:"LEVEL 5",order:"GOLDEN SODA BAR",duration:54,cups:8,speed:98,spawn:1.35,zone:32},
+ {name:"LEVEL 6",order:"ICE CUBE PANIC",duration:56,cups:9,speed:112,spawn:1.20,zone:30},
+ {name:"LEVEL 7",order:"NEON FIZZ",duration:58,cups:10,speed:126,spawn:1.08,zone:28},
+ {name:"LEVEL 8",order:"BUBBLE STORM",duration:60,cups:11,speed:140,spawn:.98,zone:26},
+ {name:"LEVEL 9",order:"OVERFLOW RUSH",duration:62,cups:12,speed:154,spawn:.90,zone:24},
+ {name:"LEVEL 10",order:"LEGENDARY SODA SHIFT",duration:66,cups:14,speed:172,spawn:.82,zone:22}
 ];
-const st={mode:"title",level:1,maxLevel:5,score:0,lives:3,combo:0,bestCombo:0,timer:50,lastTime:0,spawnTimer:0,message:"",result:null,runFinished:false,cupsServed:0,cupsGoal:6,daily:getDaily()};
+const st={mode:"title",level:1,maxLevel:10,score:0,lives:3,combo:0,bestCombo:0,timer:50,lastTime:0,spawnTimer:0,message:"",result:null,runFinished:false,cupsServed:0,cupsGoal:6,daily:getDaily()};
 const nozzle={x:370,y:125,w:60,h:26,speed:280};
 const cups=[];
 function getDaily(){return{today:new Date().toDateString(),last:localStorage.getItem("mcmeal_soda_last_play"),streak:Number(localStorage.getItem("mcmeal_soda_streak")||"0")}}
@@ -52,7 +57,7 @@ function draw(){bg();if(st.mode==="title"){title();return}playfield();cups.forEa
 function bg(){ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);ctx.fillStyle="#100d12";ctx.fillRect(0,0,W,66)}
 function playfield(){ctx.fillStyle="#0e1017";ctx.fillRect(0,66,W,510);for(let y=80;y<570;y+=38)for(let x=0;x<W;x+=52){ctx.fillStyle=(x+y)%104===0?"#1b1721":"#211923";ctx.fillRect(x,y,48,34)}ctx.fillStyle=C.floor;ctx.fillRect(70,430,W-140,14);ctx.fillStyle=C.floorDark;ctx.fillRect(70,444,W-140,8);for(let x=86;x<W-80;x+=42){ctx.fillStyle="#ffd066";ctx.fillRect(x,433,20,3)}ctx.fillStyle=C.blue;ctx.fillRect(0,150,W,4);ctx.fillStyle="#090b11";ctx.fillRect(0,575,W,85);ctx.fillStyle=C.floorDark;ctx.fillRect(0,575,W,8)}
 function hud(){const d=LV[st.level-1];ctx.fillStyle="#100d12";ctx.fillRect(0,0,W,66);ctx.fillStyle=C.meal;ctx.font="22px Courier New";ctx.fillText("MC MEAL: SODA SPRINT",20,26);ctx.fillStyle=C.text;ctx.font="18px Courier New";ctx.fillText(`Score ${st.score}`,20,54);ctx.fillText(`Lives ${st.lives}`,165,54);ctx.fillText(`Level ${st.level}/${st.maxLevel}`,285,54);ctx.fillText(`Time ${Math.ceil(st.timer)}s`,455,54);ctx.fillText(`Cups ${st.cupsServed}/${st.cupsGoal}`,610,54);if(st.message){ctx.fillStyle=C.green;ctx.font="16px Courier New";ctx.fillText(st.message,470,26)}ctx.fillStyle=C.white;ctx.font="13px Courier New";ctx.fillText(d.order,20,82)}
-function title(){txt("MC MEAL",210,140,54,C.meal,"#74311f");txt("SODA SPRINT",180,215,40,C.white,"#74311f");drawBigCup(350,285,2.1);panel(140,385,520,150);ctx.fillStyle=C.text;ctx.font="19px Courier New";ctx.fillText("Move the soda nozzle over each cup.",185,430);ctx.fillText("Hold FILL slowly and stop near the green marker.",170,462);ctx.fillText("Perfect pours build combos and rewards.",180,494);ctx.fillText("Press ENTER or tap canvas to start",210,524)}
+function title(){txt("MC MEAL",210,140,54,C.meal,"#74311f");txt("SODA SPRINT",180,215,40,C.white,"#74311f");drawBigCup(350,285,2.1);panel(140,385,520,150);ctx.fillStyle=C.text;ctx.font="19px Courier New";ctx.fillText("Move the soda nozzle over each cup.",185,430);ctx.fillText("Hold FILL slowly and stop near the green marker.",170,462);ctx.fillText("10 levels with bubbles, combos and rush pacing.",145,494);ctx.fillText("Press ENTER or tap canvas to start",210,524)}
 function drawNozzle(){ctx.fillStyle=C.blue;ctx.fillRect(nozzle.x,nozzle.y,nozzle.w,nozzle.h);ctx.fillStyle=C.cyan;ctx.fillRect(nozzle.x+8,nozzle.y+5,nozzle.w-16,5);ctx.fillStyle=C.white;ctx.fillRect(nozzle.x+nozzle.w/2-5,nozzle.y+nozzle.h,10,18)}
 function drawCup(cup){ctx.fillStyle=C.cupDark;ctx.fillRect(cup.x,cup.y,cup.w,cup.h);ctx.fillStyle=C.cup;ctx.fillRect(cup.x+5,cup.y+4,cup.w-10,cup.h-8);ctx.fillStyle=cup.special?C.gold:C.blue;const fy=cup.y+cup.h-8-(cup.h-16)*Math.min(1,cup.fill);ctx.fillRect(cup.x+8,fy,cup.w-16,cup.y+cup.h-8-fy);ctx.fillStyle=C.foam||C.white;ctx.fillRect(cup.x+9,fy-4,cup.w-18,4);const targetY=cup.y+cup.h-8-(cup.h-16)*cup.target;ctx.fillStyle=C.green;ctx.fillRect(cup.x+cup.w+4,targetY-2,12,4);ctx.fillStyle=C.red;ctx.fillRect(cup.x+cup.w+4,targetY-16,12,2);ctx.fillRect(cup.x+cup.w+4,targetY+16,12,2)}
 function orderZone(){panel(206,586,388,66);ctx.fillStyle=C.meal;ctx.font="15px Courier New";const title="ORDER TRAY";ctx.fillText(title,400-ctx.measureText(title).width/2,608);ctx.fillStyle=C.text;ctx.font="12px Courier New";const line1="perfect fills = soda + sauce";const line2="+ fizz drops";ctx.fillText(line1,400-ctx.measureText(line1).width/2,632);ctx.fillText(line2,400-ctx.measureText(line2).width/2,648)}

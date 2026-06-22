@@ -12,7 +12,7 @@
 
 ## Still included
 
-- 5 levels
+- 10 levels
 - burger variations from level 3 onward
 - increasing enemy pressure
 - separate lower order tray
