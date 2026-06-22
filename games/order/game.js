@@ -446,13 +446,19 @@ function finishRun(won) {
     drawPixelText("MC MEAL", 210, 140, 54, C.meal, "#74311f");
     drawPixelText("MYSTERY ORDER", 150, 215, 38, C.white, "#74311f");
     drawMysteryBox(354, 285, 2.2);
-    drawPanel(120, 385, 560, 150);
+    drawPanel(132, 378, 536, 162);
     ctx.fillStyle = C.text;
-    ctx.font = "19px Courier New";
-    ctx.fillText("Ingredients move on the conveyor belt.", 180, 430);
-    ctx.fillText("Move the hand and PICK the correct sequence.", 155, 462);
-    ctx.fillText("Wrong items hit the tray and cost lives.", 190, 494);
-    ctx.fillText("Press ENTER or tap canvas to start", 210, 524);
+    ctx.font = "18px Courier New";
+    const lines = [
+      "Ingredients move on the conveyor belt.",
+      "Move the hand and PICK the correct sequence.",
+      "Wrong picks hit the tray and cost lives.",
+      "Press ENTER or tap canvas to start"
+    ];
+    lines.forEach((line, i) => {
+      const w = ctx.measureText(line).width;
+      ctx.fillText(line, 400 - w / 2, 424 + i * 28);
+    });
   }
 
   function drawOrderTicket() {
@@ -563,16 +569,23 @@ function finishRun(won) {
 
   function drawLevelClear() {
     const next = Math.min(state.level + 1, state.maxLevel);
-    drawPanel(150, 190, 500, 200);
+    drawPanel(138, 182, 524, 214);
     ctx.fillStyle = C.green;
     ctx.font = "30px Courier New";
-    ctx.fillText(`${LEVELS[state.level - 1].name} COMPLETE!`, 180, 235);
+    const title = `${LEVELS[state.level - 1].name} COMPLETE!`;
+    ctx.fillText(title, 400 - ctx.measureText(title).width / 2, 230);
     ctx.fillStyle = C.text;
-    ctx.font = "19px Courier New";
-    ctx.fillText(`Score Bonus Added: ${state.level * 900}`, 210, 280);
-    ctx.fillText(`Next Order: ${LEVELS[next - 1].order}`, 205, 310);
-    ctx.fillText("Faster belt. Longer orders. More pressure.", 185, 342);
-    ctx.fillText("Press ENTER / Tap for next level", 205, 370);
+    ctx.font = "18px Courier New";
+    const lines = [
+      `Score Bonus Added: ${state.level * 900}`,
+      `Next Order: ${LEVELS[next - 1].order}`,
+      "Faster belt. Longer orders. More pressure.",
+      "Press ENTER / Tap for next level"
+    ];
+    lines.forEach((line, i) => {
+      const w = ctx.measureText(line).width;
+      ctx.fillText(line, 400 - w / 2, 274 + i * 30);
+    });
   }
 
   function drawResult() {

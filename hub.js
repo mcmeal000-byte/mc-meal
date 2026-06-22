@@ -1,4 +1,4 @@
-// MC Meal Prelaunch Private Test v3 - Secret Receipt frontend locked + cache bust
+// MC Meal Live Fix v3 - arcade gating + close buttons + layout polish
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -297,6 +297,10 @@
         "Legendary Meal": 0,
         "Golden Meal": 0
       },
+      rewardedRuns: {
+        day: null,
+        freeUsed: {}
+      },
       log: ["Welcome to MC Meal Kitchen Street."]
     };
 
@@ -304,6 +308,10 @@
     try {
       const parsed = JSON.parse(raw);
       parsed.inventory = { ...defaults.inventory, ...(parsed.inventory || {}) };
+      parsed.rewardedRuns = {
+        day: parsed.rewardedRuns?.day || defaults.rewardedRuns.day,
+        freeUsed: { ...(parsed.rewardedRuns?.freeUsed || {}) }
+      };
       parsed.log = parsed.log || defaults.log;
       return { ...defaults, ...parsed };
     } catch {
@@ -322,6 +330,35 @@
       state.log.push(text);
       if (state.log.length > 8) state.log = state.log.slice(-8);
     }
+    saveState();
+  }
+
+  function todayKey() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function ensureRewardedRunState() {
+    state.rewardedRuns = state.rewardedRuns || { day: null, freeUsed: {} };
+    if (state.rewardedRuns.day !== todayKey()) {
+      state.rewardedRuns.day = todayKey();
+      state.rewardedRuns.freeUsed = {};
+      saveState();
+    }
+    return state.rewardedRuns;
+  }
+
+  function gameRunKey(name) {
+    return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  function isFreeRunUsed(gameName) {
+    const rr = ensureRewardedRunState();
+    return rr.freeUsed[gameRunKey(gameName)] === true;
+  }
+
+  function markFreeRunUsed(gameName) {
+    const rr = ensureRewardedRunState();
+    rr.freeUsed[gameRunKey(gameName)] = true;
     saveState();
   }
 
@@ -819,7 +856,7 @@
     document.getElementById("modal").classList.add("hidden");
   }
 
-  function renderArcadeModal() {
+  function renderArcadeModal(extraMessage = "") {
     const games = [
       {
         icon: "🍔",
@@ -847,6 +884,13 @@
       }
     ];
 
+    const noticeHtml = extraMessage ? `
+      <div class="modal-panel" style="border-color:#52f0cf;">
+        <div class="season-badge">ARCADE NOTICE</div>
+        <p>${extraMessage}</p>
+      </div>
+    ` : "";
+
     setContent(`
       <div class="modal-panel">
         <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
@@ -854,18 +898,23 @@
         <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Only rewarded runs are available: 1 free run per game/day, then 500 $MEAL per extra rewarded run.</p>
       </div>
 
+      ${noticeHtml}
+
       <div class="modal-grid">
-        ${games.map(g => `
-          <div class="modal-panel">
-            <div class="season-badge">LEVEL 10 MINI-GAME</div>
-            <h3>${g.icon} ${g.name}</h3>
-            <p>${g.subtitle}. Rewards are only submitted after a rewarded run.</p>
-            <div style="display:grid; gap:8px; margin-top:12px;">
-              <button class="action-btn" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="free">DAILY FREE REWARD RUN</button>
-              <button class="small-btn gold" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="paid">EXTRA REWARD RUN — ${EXTRA_REWARDED_RUN_COST} $MEAL</button>
+        ${games.map(g => {
+          const freeUsed = isFreeRunUsed(g.name);
+          return `
+            <div class="modal-panel">
+              <div class="season-badge">LEVEL 10 MINI-GAME</div>
+              <h3>${g.icon} ${g.name}</h3>
+              <p>${g.subtitle}. Rewards are only submitted after a rewarded run.</p>
+              <div style="display:grid; gap:8px; margin-top:12px;">
+                <button class="action-btn ${freeUsed ? 'disabled-like' : ''}" ${freeUsed ? 'disabled' : ''} data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="free">${freeUsed ? 'DAILY FREE RUN USED TODAY' : 'DAILY FREE REWARD RUN'}</button>
+                <button class="small-btn gold" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="paid">EXTRA REWARD RUN — ${EXTRA_REWARDED_RUN_COST} $MEAL</button>
+              </div>
             </div>
-          </div>
-        `).join("")}
+          `;
+        }).join("")}
       </div>
     `);
 
@@ -882,6 +931,12 @@
   function openRealGame(src, gameName, runMode = "free") {
     if (!requireWallet("mini-games")) return;
 
+    if (runMode === "free" && isFreeRunUsed(gameName)) {
+      addLog(`${gameName}: daily free rewarded run already used today.`);
+      renderArcadeModal(`The free rewarded run for <strong>${gameName}</strong> was already used today. Start the <strong>Extra Reward Run</strong> for ${EXTRA_REWARDED_RUN_COST} $MEAL to keep earning rewards.`);
+      return;
+    }
+
     activeGameRun = {
       gameName,
       runMode,
@@ -892,7 +947,7 @@
 
     const noteText = runMode === "paid"
       ? `Extra rewarded run active. If the result is submitted successfully, ${EXTRA_REWARDED_RUN_COST} $MEAL is charged by the backend.`
-      : "Daily free rewarded run active. If today's free run for this game is already used, start an Extra Reward Run for 500 $MEAL.";
+      : "Daily free rewarded run active. This game can reward only once for free today.";
 
     setContent(`
       <div class="real-game-wrap">
@@ -900,18 +955,20 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=polish-v1" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-fix-v3" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
           <button class="small-btn gold" id="backToArcadeReal">BACK TO ARCADE</button>
           <button class="small-btn" id="openGameNewTab">OPEN FULL SCREEN</button>
+          <button class="small-btn red" id="closeArcadeGame">CLOSE</button>
         </div>
       </div>
     `);
 
-    document.getElementById("backToArcadeReal").addEventListener("click", renderArcadeModal);
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(src, "_blank"));
+    document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v3`, "_blank"));
+    document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
   async function applyRealGameReward(payload) {
@@ -950,6 +1007,7 @@
       });
 
       syncBackendState(result);
+      if (result.runType !== "paid") markFreeRunUsed(gameKey);
       const runTypeText = result.runType === "paid" ? `Extra run paid: ${result.entryCostMeal || EXTRA_REWARDED_RUN_COST} $MEAL` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
 
@@ -960,6 +1018,10 @@
       const msg = err?.message || "submit_failed";
       addLog(`${gameKey}: backend save failed (${msg}).`);
       const extra = msg === "free_run_already_used" ? ` Daily free run already used. Start an Extra Reward Run for ${EXTRA_REWARDED_RUN_COST} $MEAL.` : "";
+      if (msg === "free_run_already_used") {
+        markFreeRunUsed(gameKey);
+        renderArcadeModal(`The free rewarded run for <strong>${gameKey}</strong> is already used today. Use the <strong>Extra Reward Run</strong> button for ${EXTRA_REWARDED_RUN_COST} $MEAL.`);
+      }
       if (note) note.innerHTML = `<strong>Backend save failed:</strong> ${msg}.${extra}`;
     }
   }

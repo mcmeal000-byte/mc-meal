@@ -922,3 +922,7 @@ canvas {
 .game-launch-note { border-color: rgba(82,240,207,.35); background: linear-gradient(135deg, rgba(18,20,26,.95), rgba(45,28,35,.95)); }
 .action-btn, .small-btn { transition: transform .08s ease, filter .08s ease; }
 .action-btn:hover, .small-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
+
+.small-btn.red{border-color:#e95d45;color:#ff9d8b;}
+.disabled-like{opacity:.6;cursor:not-allowed;}
+button:disabled{opacity:.6;cursor:not-allowed;}

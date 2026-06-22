@@ -781,13 +781,15 @@ function finishRun(won) {
     drawPixelText("BURGER STACK", 170, 215, 34, COLORS.white, "#74311f");
     drawChefIcon(360, 290, 3);
 
-    drawPanel(150, 385, 500, 150);
+    drawPanel(145, 378, 510, 162);
     ctx.fillStyle = COLORS.text;
-    ctx.font = "19px Courier New";
-    ctx.fillText("10 levels with increasing indie-kitchen chaos", 135, 430);
-    ctx.fillText("New orders, faster enemies and bigger stacks", 155, 462);
-    ctx.fillText("Order name moved below the tray", 215, 494);
-    ctx.fillText("Press ENTER or tap canvas to start", 210, 524);
+    ctx.font = "18px Courier New";
+    drawCenteredLines([
+      "10 levels with increasing indie-kitchen chaos.",
+      "New orders, faster enemies and bigger stacks.",
+      "Order names now stay below the tray.",
+      "Press ENTER or tap canvas to start"
+    ], 400, 424, 28);
   }
 
   function drawLevel() {
@@ -1007,18 +1009,21 @@ function finishRun(won) {
 
   function drawLevelClear() {
     const next = Math.min(state.level + 1, state.maxLevel);
-    drawPanel(150, 178, 500, 200);
+    drawPanel(135, 168, 530, 214);
     ctx.fillStyle = COLORS.green;
     ctx.font = "30px Courier New";
-    ctx.fillText(`${LEVELS[state.level - 1].title} COMPLETE!`, 180, 223);
+    drawCenteredLines([`${LEVELS[state.level - 1].title} COMPLETE!`], 400, 222, 30);
 
     ctx.fillStyle = COLORS.text;
-    ctx.font = "19px Courier New";
-    ctx.fillText(`Score Bonus Added: ${1000 * state.level}`, 210, 270);
-    ctx.fillText(`Next Order: ${LEVELS[next - 1].orderName}`, 205, 300);
-    ctx.fillText("Enemies get faster.", 270, 332);
-    ctx.fillText("New burger variation unlocked.", 205, 356);
-    ctx.fillText("Press ENTER / Tap for next level", 205, 380);
+    ctx.font = "18px Courier New";
+    drawCenteredLines([`Score Bonus Added: ${1000 * state.level}`], 400, 268, 26);
+    const nextLines = wrapText(`Next Order: ${LEVELS[next - 1].orderName}`, 360);
+    drawCenteredLines(nextLines, 400, 296, 24);
+    drawCenteredLines([
+      "Enemies get faster.",
+      "New burger variation unlocked.",
+      "Press ENTER / Tap for next level"
+    ], 400, 324 + (nextLines.length - 1) * 22, 24);
   }
 
   function drawResult() {
@@ -1079,6 +1084,29 @@ function finishRun(won) {
     ctx.fillText(text, x + 4, y + 4);
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
+  }
+
+  function wrapText(text, maxWidth) {
+    const words = String(text || "").split(/\s+/);
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width <= maxWidth) line = test;
+      else {
+        if (line) lines.push(line);
+        line = word;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawCenteredLines(lines, centerX, startY, lineHeight) {
+    lines.forEach((line, idx) => {
+      const w = ctx.measureText(line).width;
+      ctx.fillText(line, centerX - w / 2, startY + idx * lineHeight);
+    });
   }
 
   function loop(t) {
