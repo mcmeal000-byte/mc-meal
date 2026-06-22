@@ -625,7 +625,7 @@ function finishRun(won) {
     }
     ctx.fillStyle = C.white;
     ctx.font = "18px Courier New";
-    ctx.fillText("Press ENTER / Tap to play again", 160, 520);
+    ctx.fillText("Return to Arcade to play again", 160, 520);
   }
 
   function drawPanel(x, y, w, h) {
@@ -753,7 +753,8 @@ function finishRun(won) {
   }
 
   function action() {
-    if (state.mode === "title" || state.mode === "result") resetRun();
+    if (state.mode === "title") resetRun();
+    else if (state.mode === "result") return;
     else if (state.mode === "levelclear") { state.level++; setupLevel(state.level); state.mode = "play"; }
   }
 

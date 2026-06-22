@@ -1,4 +1,4 @@
-// MC Meal Live Fix v3 - arcade gating + close buttons + layout polish
+// MC Meal Live Fix v4.1 250 MEAL - arcade gating + close buttons + layout polish
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -157,7 +157,7 @@
     }
   };
 
-  const EXTRA_REWARDED_RUN_COST = 500;
+  const EXTRA_REWARDED_RUN_COST = 250;
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
@@ -895,7 +895,7 @@
       <div class="modal-panel">
         <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
         <h3>Daily Rewarded Runs</h3>
-        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Only rewarded runs are available: 1 free run per game/day, then 500 $MEAL per extra rewarded run.</p>
+        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Only rewarded runs are available: 1 free run per game/day, then 250 $MEAL per extra rewarded run.</p>
       </div>
 
       ${noticeHtml}
@@ -955,7 +955,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-fix-v3" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-fix-v4-250" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -967,7 +967,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v3`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v4-250`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 

@@ -7,12 +7,12 @@ Final rule:
 - Only verified $MEAL holders may enter/play after token launch.
 - Prelaunch remains private-test locked through `ALLOWED_TEST_WALLETS`.
 - Each holder gets **1 free rewarded run per mini-game per day**.
-- After the daily free run is used for that specific game, every extra rewarded run costs **500 $MEAL**.
+- After the daily free run is used for that specific game, every extra rewarded run costs **250 $MEAL**.
 - Practice mode stays playable for holders, but gives no backend XP or ingredients.
 
 ### Extra Run Split v1
 
-For each 500 $MEAL extra rewarded run:
+For each 250 $MEAL extra rewarded run:
 
 - 400 $MEAL burned/tracked as burned
 - 100 $MEAL added to reward pool
@@ -30,7 +30,7 @@ All four current mini-games have been upgraded to a minimum 10-level run:
 Frontend Arcade now shows:
 
 - Daily Free Reward Run
-- Extra Reward Run — 500 $MEAL
+- Extra Reward Run — 250 $MEAL
 - Practice — No Rewards
 
 ## Backend Deployment Order
@@ -48,4 +48,4 @@ After $MEAL mint exists:
 
 - Replace allowlist gate with signature + holder balance check.
 - Keep the same run economy logic.
-- `500 $MEAL` extra run becomes real token utility after transaction verification is wired.
+- `250 $MEAL` extra run becomes real token utility after transaction verification is wired.

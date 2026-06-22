@@ -1064,7 +1064,7 @@ function finishRun(won) {
 
     ctx.fillStyle = COLORS.white;
     ctx.font = "18px Courier New";
-    ctx.fillText("Press ENTER / Tap to play again", 170, 470);
+    ctx.fillText("Return to Arcade to play again", 170, 470);
   }
 
   function drawPanel(x, y, w, h) {
@@ -1118,8 +1118,10 @@ function finishRun(won) {
   }
 
   function handlePrimaryAction() {
-    if (state.mode === "title" || state.mode === "result") {
+    if (state.mode === "title") {
       resetRun();
+    } else if (state.mode === "result") {
+      return;
     } else if (state.mode === "levelclear") {
       nextLevel();
     }
