@@ -895,7 +895,7 @@
       <div class="modal-panel">
         <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
         <h3>Daily Rewarded Runs</h3>
-        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Only rewarded runs are available: 1 free run per game/day, then 250 $MEAL per extra rewarded run.</p>
+        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Extra rewarded runs are capped at <strong>20 per wallet/day</strong> to protect the kitchen economy.</p>
       </div>
 
       ${noticeHtml}
@@ -955,7 +955,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-fix-v4-250" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-fix-v5-limits" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -967,7 +967,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v4-250`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v5-limits`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1017,10 +1017,14 @@
     } catch (err) {
       const msg = err?.message || "submit_failed";
       addLog(`${gameKey}: backend save failed (${msg}).`);
-      const extra = msg === "free_run_already_used" ? ` Daily free run already used. Start an Extra Reward Run for ${EXTRA_REWARDED_RUN_COST} $MEAL.` : "";
+      let extra = msg === "free_run_already_used" ? ` Daily free run already used. Start an Extra Reward Run for ${EXTRA_REWARDED_RUN_COST} $MEAL.` : "";
+      if (msg === "paid_run_daily_limit_reached") extra = " Daily extra rewarded run limit reached. Come back tomorrow.";
       if (msg === "free_run_already_used") {
         markFreeRunUsed(gameKey);
         renderArcadeModal(`The free rewarded run for <strong>${gameKey}</strong> is already used today. Use the <strong>Extra Reward Run</strong> button for ${EXTRA_REWARDED_RUN_COST} $MEAL.`);
+      }
+      if (msg === "paid_run_daily_limit_reached") {
+        renderArcadeModal(`<strong>Daily limit reached.</strong> You used the maximum 20 extra rewarded runs for today. Come back tomorrow.`);
       }
       if (note) note.innerHTML = `<strong>Backend save failed:</strong> ${msg}.${extra}`;
     }
@@ -1060,7 +1064,7 @@
         icon: "🎁",
         name: "Mystery Meal Attempt",
         resultItem: "Mystery Meal",
-        description: "Costs 500 $MEAL. Mystery odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
+        description: "Costs 500 $MEAL. Max 3 Mystery Meal attempts per wallet/day. Odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
         costMeal: 500,
         burnRate: 0.9,
         requirements: [["Bun",1],["Patty",1],["Cheese",1],["Fries",1],["Soda",1],["Sauce",1],["Mystery Ticket",1]]
@@ -1219,11 +1223,14 @@
         recipeId: type
       });
       syncBackendState(result);
-      addLog(`Crafted ${result.recipeName} → ${result.resultItem}. +${result.xpEarned} XP.`);
+      const craftedName = result.recipeName || type;
+      const craftedXp = result.xpEarned ?? result.xp ?? 0;
+      addLog(`Crafted ${craftedName} → ${result.resultItem}. +${craftedXp} XP.`);
     } catch (err) {
       const msg = err?.message || "craft_failed";
       if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
       else if (msg === "not_enough_meal") addLog("Craft failed: not enough $MEAL.");
+      else if (msg === "mystery_craft_daily_limit_reached") addLog("Craft failed: daily Mystery Meal limit reached. Come back tomorrow.");
       else addLog(`Craft failed: ${msg}.`);
     }
 

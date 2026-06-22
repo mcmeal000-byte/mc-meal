@@ -49,3 +49,14 @@ After $MEAL mint exists:
 - Replace allowlist gate with signature + holder balance check.
 - Keep the same run economy logic.
 - `250 $MEAL` extra run becomes real token utility after transaction verification is wired.
+
+
+## Economy safety limits v5
+
+- Free Reward Runs: 1 per game per wallet per day.
+- Paid Extra Reward Runs: max 20 per wallet per day.
+- Extra Reward Run cost: 250 $MEAL.
+- Extra Reward Run split: 200 burn / 50 reward pool.
+- Mystery Meal Attempts: max 3 per wallet per day.
+- Daily Claim: 1 per wallet per day.
+- Mystery odds unchanged: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.
