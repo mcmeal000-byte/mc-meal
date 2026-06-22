@@ -49,20 +49,3 @@ Season 0 progression is backend-synced. Real $MEAL settlement should only be act
 
 ## v3 cache fix
 Secret Receipt is visible as COMING SOON and disabled in the shop. index.html uses cache-busted script/style URLs so GitHub Pages does not keep the old hub.js.
-
-## Phase A/B Upgrade Included
-
-This build includes the planned Phase A and Phase B preparation:
-
-- holder-only run economy UI
-- 1 free rewarded run per game/day
-- extra rewarded run = 500 $MEAL
-- practice mode with no rewards
-- all four mini-games extended to 10 levels
-- indie pixel UI polish pass
-
-Backend setup files are in:
-
-`backend/phaseA/`
-
-Run the SQL first, then replace `submit-run` with the provided function code.

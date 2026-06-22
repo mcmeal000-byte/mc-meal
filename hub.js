@@ -851,7 +851,7 @@
       <div class="modal-panel">
         <div class="season-badge">HOLDER-ONLY RUN ECONOMY</div>
         <h3>Daily Rewarded Runs</h3>
-        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Practice runs stay playable for holders, but do not save rewards.</p>
+        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Only rewarded runs are available: 1 free run per game/day, then 500 $MEAL per extra rewarded run.</p>
       </div>
 
       <div class="modal-grid">
@@ -863,7 +863,6 @@
             <div style="display:grid; gap:8px; margin-top:12px;">
               <button class="action-btn" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="free">DAILY FREE REWARD RUN</button>
               <button class="small-btn gold" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="paid">EXTRA REWARD RUN — ${EXTRA_REWARDED_RUN_COST} $MEAL</button>
-              <button class="small-btn" data-real-game="${g.src}" data-game-name="${g.name}" data-run-mode="practice">PRACTICE — NO REWARDS</button>
             </div>
           </div>
         `).join("")}
@@ -877,7 +876,6 @@
 
   function runModeLabel(mode) {
     if (mode === "paid") return `Extra Reward Run · ${EXTRA_REWARDED_RUN_COST} $MEAL`;
-    if (mode === "practice") return "Practice Run · no backend rewards";
     return "Daily Free Reward Run";
   }
 
@@ -892,11 +890,9 @@
 
     setModalHeader(gameName, runModeLabel(runMode));
 
-    const noteText = runMode === "practice"
-      ? "Practice mode is active. You can play freely, but this run will not submit XP or ingredients."
-      : runMode === "paid"
-        ? `Extra rewarded run active. If the result is submitted successfully, ${EXTRA_REWARDED_RUN_COST} $MEAL is charged by the backend.`
-        : "Daily free rewarded run active. If today's free run for this game is already used, the backend will reject the reward and ask for an extra run.";
+    const noteText = runMode === "paid"
+      ? `Extra rewarded run active. If the result is submitted successfully, ${EXTRA_REWARDED_RUN_COST} $MEAL is charged by the backend.`
+      : "Daily free rewarded run active. If today's free run for this game is already used, start an Extra Reward Run for 500 $MEAL.";
 
     setContent(`
       <div class="real-game-wrap">
@@ -904,7 +900,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=level10" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=polish-v1" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -923,12 +919,6 @@
 
     const note = document.getElementById("realGameRewardNote");
     const runInfo = activeGameRun || { runMode: "free", gameName: payload.game || "Mini Game" };
-
-    if (runInfo.runMode === "practice") {
-      addLog(`${payload.game || "Mini Game"}: practice run finished. No backend rewards submitted.`);
-      if (note) note.innerHTML = `<strong>Practice finished:</strong> Score ${Number(payload.score || 0)} · no XP or ingredient rewards saved.`;
-      return;
-    }
 
     if (!requireWallet("game rewards")) {
       if (note) note.innerHTML = `<strong>Wallet required:</strong> Connect Phantom in the Launch building, then play again to save rewards on the backend.`;
@@ -1008,7 +998,7 @@
         icon: "🎁",
         name: "Mystery Meal Attempt",
         resultItem: "Mystery Meal",
-        description: "Costs 500 $MEAL. Can roll Common, Rare, Supreme, Legendary or Golden Meal.",
+        description: "Costs 500 $MEAL. Mystery odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
         costMeal: 500,
         burnRate: 0.9,
         requirements: [["Bun",1],["Patty",1],["Cheese",1],["Fries",1],["Soda",1],["Sauce",1],["Mystery Ticket",1]]
@@ -1115,7 +1105,7 @@
         <div class="modal-panel">
           <h3>${recipes.mystery.icon} ${recipes.mystery.name}</h3>
           <p>${recipes.mystery.description}</p>
-          <div style="color:#b9a88a; margin-top:6px; margin-bottom:4px;">Possible results: Kitchen Scrap, Common, Rare, Supreme, Legendary, Golden</div>
+          <div style="color:#b9a88a; margin-top:6px; margin-bottom:4px;">Odds: Scrap 40% · Common 35% · Rare 18% · Supreme 5.5% · Legendary 1.25% · Golden 0.25%</div>
           ${recipeStatusLabel(mysteryStatus)}
           ${renderRecipeRequirements(mysteryStatus, recipes.mystery.costMeal)}
           <button class="action-btn" data-craft="mystery" ${mysteryStatus.canCraft ? "" : "disabled"}>CRAFT MYSTERY</button>
