@@ -130,7 +130,7 @@
     {
       id: "launch",
       name: "LAUNCH",
-      subtitle: "Wallet + tiers",
+      subtitle: "Wallet + Access",
       x: 714,
       y: 430,
       w: 185,
@@ -234,6 +234,14 @@
 
   function hasPrivateAccess() {
     return Boolean(state.wallet && state.prelaunchAccess === true);
+  }
+
+  function publicAccessTierLabel(rawTier) {
+    const tier = String(rawTier || "");
+    if (!tier || tier === "Visitor" || tier.toLowerCase().includes("private") || tier.toLowerCase().includes("test")) {
+      return hasPrivateAccess() ? "Kitchen Access" : "Wallet Required";
+    }
+    return tier;
   }
 
   function requireWallet(actionLabel = "this action") {
@@ -955,7 +963,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-fix-v7-final-ui" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-fix-v8-launch-clean" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -967,7 +975,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v7-final-ui`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v8-launch-clean`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1663,7 +1671,7 @@
     setContent(`
       <div class="big-cta">
         <div>MC MEAL KITCHEN</div>
-        <div>Backend-synced kitchen economy · $MEAL holder access ready</div>
+        <div>Backend-synced kitchen economy · wallet access ready</div>
       </div>
 
       <div class="modal-grid">
@@ -1684,7 +1692,7 @@
         </div>
 
         <div class="modal-panel">
-          <h3>$MEAL Access Tiers</h3>
+          <h3>Kitchen Access Tiers</h3>
           <div class="roadmap">
             <div><strong>Access</strong> Wallet required</div>
             <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
@@ -1697,9 +1705,9 @@
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Backend Live</h3>
+          <h3>Backend Status</h3>
           <div class="roadmap">
-            <div>Server wallet profile: live</div>
+            <div>Wallet profile sync: live</div>
             <div>Daily claim per wallet: live</div>
             <div>Run submit API with duplicate protection: live</div>
             <div>Craft + shop verification: live</div>
@@ -1709,8 +1717,8 @@
         <div class="modal-panel">
           <h3>Kitchen Status</h3>
           <div class="roadmap">
-            <div>Hub: live</div>
-            <div>4 real games: backend rewards connected</div>
+            <div>Kitchen hub: live</div>
+            <div>4 real games: rewards connected</div>
             <div>Supabase save: active</div>
             <div>Wallet profile: active</div>
           </div>

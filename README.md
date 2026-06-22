@@ -81,3 +81,11 @@ Removed public-facing test/prelaunch/season wording from the interface:
 - Solana $MEAL Prelaunch -> Solana $MEAL
 - Launch/Access modals now use final wallet / holder access language
 - Arcade/Craft/Shop/Daily copy cleaned for final surface
+
+
+## Launch Page Clean v8
+
+Cleaned the Launch / Wallet page:
+- Access Tier no longer exposes backend/private-test wording.
+- Internal `Private Test Access` is displayed as `Kitchen Access`.
+- Launch modal wording changed to final wallet/access language.
