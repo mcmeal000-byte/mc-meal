@@ -1,4 +1,4 @@
-// MC Meal Live v11 - $MEAL holder access fixed + shop itemId fix
+// MC Meal Live v12 - RPC CORS fix + $MEAL holder/shop/craft fix
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -177,7 +177,7 @@
   const MYSTERY_CRAFT_COST_MEAL = 500;
   const MYSTERY_CRAFT_BURN_MEAL = 450;
   const MYSTERY_CRAFT_POOL_MEAL = 50;
-  const SOLANA_RPC_URL = "https://solana-rpc.publicnode.com";
+  const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
@@ -1962,7 +1962,18 @@
 
   async function fetchMealBalance(walletAddress) {
     const cfg = await loadConfig();
-    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) cfg = { MEAL_MINT: OFFICIAL_MEAL_MINT, SOLANA_RPC: "https://solana-rpc.publicnode.com" };
+
+    const mealMint =
+      cfg && cfg.MEAL_MINT && !cfg.MEAL_MINT.includes("REPLACE")
+        ? cfg.MEAL_MINT
+        : OFFICIAL_MEAL_MINT;
+
+    // Browser-safe RPC fallback.
+    // publicnode blocks mcmeal.xyz with CORS, so never use it in the frontend.
+    const rpcUrl =
+      cfg && cfg.SOLANA_RPC && !String(cfg.SOLANA_RPC).includes("publicnode")
+        ? cfg.SOLANA_RPC
+        : "https://api.mainnet-beta.solana.com";
 
     const body = {
       jsonrpc: "2.0",
@@ -1970,12 +1981,12 @@
       method: "getTokenAccountsByOwner",
       params: [
         walletAddress,
-        { mint: cfg.MEAL_MINT },
+        { mint: mealMint },
         { encoding: "jsonParsed" }
       ]
     };
 
-    const res = await fetch(cfg.SOLANA_RPC || "https://solana-rpc.publicnode.com", {
+    const res = await fetch(rpcUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -1983,11 +1994,21 @@
 
     const data = await res.json();
     const accounts = data?.result?.value || [];
+
     let total = 0;
+
     for (const acc of accounts) {
-      const ui = acc?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0;
-      total += Number(ui);
+      const tokenAmount = acc?.account?.data?.parsed?.info?.tokenAmount;
+      const uiAmountString = tokenAmount?.uiAmountString;
+      const uiAmount = tokenAmount?.uiAmount;
+      const amount =
+        uiAmountString !== undefined
+          ? Number(uiAmountString)
+          : Number(uiAmount || 0);
+
+      if (Number.isFinite(amount)) total += amount;
     }
+
     return total;
   }
 
@@ -2018,7 +2039,7 @@
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
           <h3>Wallet Connect</h3>
-          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>Hold 1 $MEAL</strong>. Use the official $MEAL link below.</p>
+          <p>Connect Phantom to open the Kitchen. Holder access: <strong>Hold at least 1 $MEAL</strong>. Use the official $MEAL link below.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
