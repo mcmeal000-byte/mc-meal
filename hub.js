@@ -1,4 +1,4 @@
-// MC Meal Live v13 - server-prepared onchain payments + sell/craft hardening
+// MC Meal Live v17 - onchain Load Credits + server-prepared payments
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -162,7 +162,8 @@
       craft: "/craft",
       shopBuy: "/shop-buy-demo",
       shopSell: "/shop-sell-demo",
-      createPayment: "/create-onchain-payment"
+      createPayment: "/create-onchain-payment",
+      loadCredits: "/load-kitchen-credits"
     }
   };
 
@@ -178,6 +179,11 @@
   const MYSTERY_CRAFT_COST_MEAL = 500;
   const MYSTERY_CRAFT_BURN_MEAL = 450;
   const MYSTERY_CRAFT_POOL_MEAL = 50;
+  const LOAD_CREDITS_ACTION = "load_credits_10000";
+  const LOAD_CREDITS_AMOUNT = 10000;
+  const LOAD_CREDITS_BURN_MEAL = 2000;
+  const LOAD_CREDITS_REWARD_MEAL = 7000;
+  const LOAD_CREDITS_TREASURY_MEAL = 1000;
   const SOLANA_RPC_URL = ""; // v13: browser no longer calls public RPC for onchain payments. Server prepares tx.
   let activeGameRun = null;
 
@@ -454,9 +460,13 @@
     }
 
     const plan = payment.plan || {};
-    const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : "Extra Reward Run");
+    const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : actionType === LOAD_CREDITS_ACTION ? "Load Kitchen Credits" : "Extra Reward Run");
 
-    addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
+    if (actionType === LOAD_CREDITS_ACTION) {
+      addLog(`${label}: Phantom will open for ${plan.totalMeal || LOAD_CREDITS_AMOUNT} $MEAL. Split: ${plan.burnMeal || 0} burn · ${plan.rewardMeal || 0} Reward Vault · ${plan.treasuryMeal || 0} Treasury.`);
+    } else {
+      addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
+    }
 
     const tx = web3.Transaction.from(base64ToUint8Array(payment.transactionBase64));
 
@@ -1683,7 +1693,7 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN SHOP</div>
         <h3>Buy Materials</h3>
-        <p>Buy materials with spendable Kitchen Credits. Use + / repeat buys to stack ingredients. Onchain settlement is reserved for Mystery Craft and premium actions.</p>
+        <p>Buy materials with spendable Kitchen Credits. Load credits onchain once, then buy fast without opening Phantom for every ingredient.</p>
         <div class="action-list">
           ${shop.map(([label,item,qty,price,note,locked]) => `
             <div class="action-row ${locked ? "locked-row" : ""}">
@@ -1693,6 +1703,25 @@
             </div>
           `).join("")}
         </div>
+      </div>
+    `;
+
+    const loadHtml = `
+      <div class="modal-panel">
+        <div class="season-badge">ONCHAIN LOAD</div>
+        <h3>Load Kitchen Credits</h3>
+        <p>Load 10,000 spendable Kitchen Credits with one real $MEAL wallet transaction. You keep fast gameplay after the load.</p>
+        <div class="item-list">
+          <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Total Wallet Payment</strong><span>One Phantom transaction</span></div><strong>10,000 $MEAL</strong></div>
+          <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burn</strong><span>Real onchain Token-2022 burn</span></div><strong>2,000 $MEAL</strong></div>
+          <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Reward Vault</strong><span>Funds future rewards / claims</span></div><strong>7,000 $MEAL</strong></div>
+          <div class="item-row"><div class="pixel-icon">👑</div><div><strong>Treasury</strong><span>Project revenue / operations</span></div><strong>1,000 $MEAL</strong></div>
+          <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>You receive</strong><span>Spendable in-game Kitchen Credits</span></div><strong>10,000 Credits</strong></div>
+        </div>
+        <br />
+        <div class="station-status"><strong>Important:</strong> Keep at least 10,000 $MEAL in your wallet after loading, otherwise the Kitchen holder gate may lock on the next sync.</div>
+        <br />
+        <button class="primary-btn" data-load-credits="10000">LOAD 10,000 CREDITS</button>
       </div>
     `;
 
@@ -1717,12 +1746,13 @@
       <div class="modal-panel">
         <div class="season-badge">TOKEN SETTLEMENT</div>
         <h3>Market Logic</h3>
-        <p>For live safety, normal materials use Kitchen Credits. Larger actions can be bundled into one wallet signature later.</p>
+        <p>MC Meal now separates wallet holdings from spendable Kitchen Credits.</p>
         <div class="roadmap">
-          <div><strong>Current:</strong> material buys are backend-synced Kitchen Credit actions</div>
-          <div><strong>Later:</strong> optional cart checkout can batch multiple buys into one Phantom transaction</div>
-          <div><strong>Replay protection:</strong> every Solana signature is stored once</div>
-          <div><strong>Safety:</strong> daily limits, rate limits and suspicious action logs</div>
+          <div><strong>Load Credits:</strong> one onchain $MEAL transaction adds spendable Kitchen Credits</div>
+          <div><strong>Split:</strong> 20% burn · 70% Reward Vault · 10% Treasury</div>
+          <div><strong>Materials:</strong> bought quickly with Kitchen Credits, no Phantom popup per item</div>
+          <div><strong>Mystery Craft:</strong> still uses a real 450 burn + 50 Reward Vault transaction</div>
+          <div><strong>Next:</strong> claim/sell crafted meals for onchain $MEAL from a capped payout wallet</div>
         </div>
       </div>
     `;
@@ -1730,6 +1760,7 @@
     setContent(`
       <div class="market-tabs">
         <button class="market-tab ${activeTab === "buy" ? "active" : ""}" data-tab="buy">BUY</button>
+        <button class="market-tab ${activeTab === "load" ? "active" : ""}" data-tab="load">LOAD CREDITS</button>
         <button class="market-tab ${activeTab === "sell" ? "active" : ""}" data-tab="sell">SELL</button>
         <button class="market-tab ${activeTab === "market" ? "active" : ""}" data-tab="market">MARKET PLAN</button>
       </div>
@@ -1738,20 +1769,48 @@
         <div class="modal-panel">
           <h3>Kitchen Balances</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Wallet Holdings</strong><span>Live onchain $MEAL balance for tier access</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Credits</strong><span>Spendable in-game balance for shop/crafting</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Tier Holdings</strong><span>Live onchain $MEAL for access/tier only</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Credits</strong><span>Spendable balance loaded/earned in-game</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
           <br />
-          <div class="station-status"><strong>Kitchen:</strong> Material buys use spendable Kitchen Credits for smoother gameplay. Mystery Craft is the real onchain burn + Reward Vault action.</div>
+          <div class="station-status"><strong>Kitchen:</strong> Wallet holdings are for tiers. Materials spend Kitchen Credits. Use LOAD CREDITS to fund credits onchain.</div>
         </div>
-        ${activeTab === "buy" ? buyHtml : activeTab === "sell" ? sellHtml : marketHtml}
+        ${activeTab === "buy" ? buyHtml : activeTab === "load" ? loadHtml : activeTab === "sell" ? sellHtml : marketHtml}
       </div>
     `);
 
     document.querySelectorAll("[data-tab]").forEach(btn => {
       btn.addEventListener("click", () => renderShopModal(btn.dataset.tab));
+    });
+
+
+    document.querySelectorAll("[data-load-credits]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!requireWallet("load credits")) return renderShopModal("load");
+
+        try {
+          const signature = await payMealOnchain(LOAD_CREDITS_ACTION);
+
+          const result = await backendCall(BACKEND.endpoints.loadCredits, {
+            walletAddress: state.wallet,
+            actionType: LOAD_CREDITS_ACTION,
+            paymentSignature: signature,
+            signature
+          }, 30000);
+
+          syncBackendState(result);
+
+          addLog(`Loaded ${formatMealAmount(result.creditsLoaded || LOAD_CREDITS_AMOUNT)} Kitchen Credits onchain. Burned ${formatMealAmount(result.burnedMeal || LOAD_CREDITS_BURN_MEAL)} $MEAL · ${formatMealAmount(result.rewardVaultMeal || LOAD_CREDITS_REWARD_MEAL)} to Reward Vault · ${formatMealAmount(result.treasuryMeal || LOAD_CREDITS_TREASURY_MEAL)} to Treasury.`);
+        } catch (err) {
+          const backendError = err?.data?.error || err?.message || "load_credits_failed";
+          console.log("MCMEAL LOAD CREDITS ERROR:", err?.data || err);
+          addLog(`Load Credits failed: ${backendError}.`);
+        }
+
+        renderShopModal("load");
+      });
     });
 
     document.querySelectorAll("[data-buy]").forEach(btn => {
@@ -1784,10 +1843,7 @@
 
           const boughtQty = result.qty ?? result.amount ?? 0;
           const boughtItem = result.item ?? result.itemName ?? item;
-          const burned = result.burned ?? result.burnedMeal ?? 0;
-          const pool = result.pool ?? result.poolMeal ?? 0;
-
-          addLog(`Bought ${boughtQty}x ${boughtItem}. ${burned} $MEAL burned, ${pool} to pool.`);
+          addLog(`Bought ${boughtQty}x ${boughtItem} with Kitchen Credits.`);
         } catch (err) {
           const msg = err?.message || "shop_buy_failed";
           const backendError = err?.data?.error || msg;
@@ -1795,8 +1851,8 @@
           console.log("MCMEAL SHOP BUY ERROR:", err?.data || err);
 
           addLog(
-            backendError === "insufficient_kitchen_meal_balance"
-              ? `Shop buy failed: not enough Kitchen $MEAL for ${item}.`
+            (backendError === "insufficient_kitchen_meal_balance" || backendError === "insufficient_kitchen_credits")
+              ? `Shop buy failed: not enough Kitchen Credits for ${item}. Use LOAD CREDITS first.`
               : backendError === "not_meal_holder"
                 ? `Shop buy failed: wallet is not detected as $MEAL holder.`
                 : backendError === "unknown_shop_item"
