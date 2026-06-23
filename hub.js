@@ -1365,6 +1365,22 @@
       });
 
       syncBackendState(result);
+
+      // v16: Some submit-run responses save rewards on the backend but do not return a full inventory snapshot.
+      // In that case we mirror the accepted drops locally so the Fridge updates immediately without needing
+      // to open Shop first. The next backend response with inventory remains the source of truth and will overwrite it.
+      if (!Array.isArray(result.inventory)) {
+        const savedDrops = Array.isArray(result.drops) && result.drops.length ? result.drops : dropObjects;
+        for (const drop of savedDrops) {
+          const dropItem = drop?.item;
+          const dropQty = Number(drop?.qty || 1);
+          if (dropItem && Number.isFinite(dropQty) && dropQty > 0) {
+            give(dropItem, dropQty);
+          }
+        }
+        saveState();
+      }
+
       if (result.runType !== "paid") markFreeRunUsed(gameKey);
       const runTypeText = result.runType === "paid" ? `Extra run onchain: ${result.burnedMeal || EXTRA_RUN_BURN_MEAL} burned + ${result.poolMeal || EXTRA_RUN_POOL_MEAL} to Reward Vault` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
@@ -1667,7 +1683,7 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN SHOP</div>
         <h3>Buy Materials</h3>
-        <p>Use $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
+        <p>Buy materials with spendable Kitchen Credits. Use + / repeat buys to stack ingredients. Onchain settlement is reserved for Mystery Craft and premium actions.</p>
         <div class="action-list">
           ${shop.map(([label,item,qty,price,note,locked]) => `
             <div class="action-row ${locked ? "locked-row" : ""}">
@@ -1701,10 +1717,10 @@
       <div class="modal-panel">
         <div class="season-badge">TOKEN SETTLEMENT</div>
         <h3>Market Logic</h3>
-        <p>$MEAL actions are backend-synced. Real token settlement activates with wallet signatures and transaction checks.</p>
+        <p>For live safety, normal materials use Kitchen Credits. Larger actions can be bundled into one wallet signature later.</p>
         <div class="roadmap">
-          <div><strong>Buy real:</strong> wallet signs $MEAL payment → backend verifies tx → item delivered</div>
-          <div><strong>Sell real:</strong> backend removes meal → creates payout or claim credit</div>
+          <div><strong>Current:</strong> material buys are backend-synced Kitchen Credit actions</div>
+          <div><strong>Later:</strong> optional cart checkout can batch multiple buys into one Phantom transaction</div>
           <div><strong>Replay protection:</strong> every Solana signature is stored once</div>
           <div><strong>Safety:</strong> daily limits, rate limits and suspicious action logs</div>
         </div>
@@ -1720,15 +1736,15 @@
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Shop Balance</h3>
+          <h3>Kitchen Balances</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Wallet $MEAL</strong><span>Real onchain holder balance</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Balance</strong><span>Backend game balance</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Wallet Holdings</strong><span>Live onchain $MEAL balance for tier access</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Credits</strong><span>Spendable in-game balance for shop/crafting</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
           <br />
-          <div class="station-status"><strong>Kitchen:</strong> Shop actions are backend-synced. Real $MEAL settlement comes after wallet signatures and tx checks.</div>
+          <div class="station-status"><strong>Kitchen:</strong> Material buys use spendable Kitchen Credits for smoother gameplay. Mystery Craft is the real onchain burn + Reward Vault action.</div>
         </div>
         ${activeTab === "buy" ? buyHtml : activeTab === "sell" ? sellHtml : marketHtml}
       </div>
@@ -1939,8 +1955,18 @@
           syncBackendState(result);
           addLog(`Daily claimed: streak ${result.streak}. +${result.xpEarned} XP.`);
         } catch (err) {
-          const msg = err?.message || "daily_claim_failed";
-          addLog(msg === "already_claimed_today" ? "Daily already claimed today." : `Daily claim failed: ${msg}.`);
+          const backendError = err?.data?.error || err?.message || "daily_claim_failed";
+          console.log("MCMEAL DAILY CLAIM ERROR:", err?.data || err);
+
+          if (err?.data) syncBackendState(err.data);
+
+          if (backendError === "already_claimed_today") {
+            addLog("Daily already claimed today. Come back tomorrow.");
+          } else if (backendError === "not_meal_holder" || backendError === "access_locked") {
+            addLog("Daily claim failed: hold at least 10,000 $MEAL to use Daily Kitchen rewards.");
+          } else {
+            addLog(`Daily claim failed: ${backendError}.`);
+          }
         }
         renderDailyModal();
       });
@@ -2125,6 +2151,9 @@
     const currentTier = state.mealTier || getMealTier(state.onchainMealBalance || 0);
     const tier = state.accessTier || currentTier.name || "Visitor";
     const currentBalance = formatMealAmount(state.onchainMealBalance || 0);
+    const isConnected = Boolean(state.wallet && state.backendSynced);
+    const connectButtonLabel = isConnected ? "REFRESH WALLET / TIER" : "CONNECT PHANTOM";
+    const syncText = isConnected ? "Synced" : "Connect required";
 
     setContent(`
       <div class="big-cta">
@@ -2135,8 +2164,8 @@
       <div class="modal-grid">
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
-          <h3>Wallet Connect</h3>
-          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. Your tier is based on your live onchain $MEAL balance.</p>
+          <h3>Wallet Access</h3>
+          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. If you are already connected, use refresh only after switching wallets or buying more $MEAL.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
@@ -2144,12 +2173,12 @@
             <div class="wallet-row"><span>Badge</span><strong>${currentTier.badge || "Locked"}</strong></div>
             <div class="wallet-row"><span>Wallet $MEAL</span><strong>${currentBalance}</strong></div>
             <div class="wallet-row"><span>Next Step</span><strong>${tierProgressText(state.onchainMealBalance || 0)}</strong></div>
-            <div class="wallet-row"><span>Backend Sync</span><strong>Active after connect</strong></div>
+            <div class="wallet-row"><span>Backend Sync</span><strong>${syncText}</strong></div>
             <div class="wallet-row"><span>Official Mint</span><strong style="overflow-wrap:anywhere;">EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump</strong></div>
           </div>
 
           <br />
-          <button class="action-btn" id="connectWalletBtn">CONNECT PHANTOM</button>
+          <button class="action-btn" id="connectWalletBtn">${connectButtonLabel}</button>
           <a class="small-btn gold" href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;margin-top:10px;">BUY $MEAL</a>
           <div id="walletResult" style="margin-top:12px;"></div>
         </div>
