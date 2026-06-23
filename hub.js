@@ -1,4 +1,4 @@
-// MC Meal Live v9 - $MEAL live holder access + buy links
+// MC Meal Live v11 - $MEAL holder access fixed + shop itemId fix
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -170,7 +170,7 @@
   const OFFICIAL_BUY_MEAL_URL = "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump";
   const REWARD_VAULT_WALLET = "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV";
   const TREASURY_WALLET = "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR";
-  const MIN_MEAL_BALANCE = 10000;
+  const MIN_MEAL_BALANCE = 1;
   const TOKEN_DECIMALS = 6;
   const EXTRA_RUN_BURN_MEAL = 200;
   const EXTRA_RUN_POOL_MEAL = 50;
@@ -181,11 +181,11 @@
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
-    Bun: "bun-pack",
-    Patty: "patty-pack",
-    Fries: "fries-pack",
-    Soda: "soda-pack",
-    Sauce: "sauce-pack",
+    Bun: "bun_pack",
+    Patty: "patty_pack",
+    Fries: "fries_pack",
+    Soda: "soda_pack",
+    Sauce: "sauce_pack",
     "Mystery Ticket": "mystery-ticket",
     "Recipe Fragment": "recipe-fragment",
     "Secret Receipt": "secret-receipt",
@@ -390,7 +390,9 @@
 
   function syncBackendState(data) {
     if (!data) return;
+
     const profile = data.profile || null;
+
     if (profile) {
       state.wallet = profile.wallet_address || state.wallet || null;
       state.accessTier = profile.access_tier || state.accessTier || "Visitor";
@@ -406,12 +408,22 @@
 
     if (Array.isArray(data.inventory)) {
       const nextInventory = { ...(state.inventory || {}) };
-      for (const key of Object.keys(nextInventory)) nextInventory[key] = 0;
-      for (const row of data.inventory) nextInventory[row.item_name] = Number(row.qty || 0);
+
+      for (const key of Object.keys(nextInventory)) {
+        nextInventory[key] = 0;
+      }
+
+      for (const row of data.inventory) {
+        const itemName = row.item_name || row.itemName || row.item || row.name;
+        if (!itemName) continue;
+        nextInventory[itemName] = Number(row.qty ?? row.quantity ?? row.amount ?? 0);
+      }
+
       state.inventory = nextInventory;
     }
 
     const streak = data.dailyStreak || data.streak || null;
+
     if (streak) {
       state.streak = {
         current: Number(streak.current_streak || 0),
@@ -420,9 +432,18 @@
       };
     }
 
-    if (data.allowed === true || data.mode === "prelaunch_private_test") state.prelaunchAccess = true;
+    if (
+      data.allowed === true ||
+      data.access === true ||
+      data.holder === true ||
+      data.mode === "prelaunch_private_test"
+    ) {
+      state.prelaunchAccess = true;
+    }
+
     state.backendSynced = true;
     state.lastSync = new Date().toISOString();
+
     saveState();
   }
 
@@ -449,9 +470,9 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN ACCESS LOCKED</div>
         <h3>Connect wallet to enter the Kitchen</h3>
-        <p>The Kitchen uses $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting. Minimum holder access: 10,000 $MEAL.</p>
+        <p>The Kitchen uses $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting. Minimum holder access: Hold at least 1 $MEAL.</p>
         <div class="roadmap">
-          <div><strong>Access:</strong> 10,000 $MEAL required</div>
+          <div><strong>Access:</strong> Hold at least 1 $MEAL</div>
           <div class="official-link-box"><strong>Official $MEAL:</strong><br />EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>
           <div><strong>Token:</strong> $MEAL economy</div>
           <div><strong>Holder gate:</strong> minimum $MEAL balance</div>
@@ -1594,24 +1615,56 @@
     document.querySelectorAll("[data-buy]").forEach(btn => {
       btn.addEventListener("click", async () => {
         const item = btn.dataset.buy;
-        if (!requireWallet("shop buys")) return renderShopModal("buy");
+
+        if (!requireWallet("shop buys")) {
+          return renderShopModal("buy");
+        }
+
         try {
+          const itemId = SHOP_ITEM_IDS[item] || item;
+
+          console.log("MCMEAL SHOP BUY REQUEST:", {
+            walletAddress: state.wallet,
+            itemId,
+            itemName: item
+          });
+
           const result = await backendCall(BACKEND.endpoints.shopBuy, {
             walletAddress: state.wallet,
-            shopItemId: SHOP_ITEM_IDS[item]
+            itemId,
+            shopItemId: itemId,
+            itemName: item
           });
+
+          console.log("MCMEAL SHOP BUY RESULT:", result);
+
           syncBackendState(result);
-          addLog(`Bought ${result.qty}x ${result.item}. ${result.burned} $MEAL burned, ${result.pool} to pool.`);
+
+          const boughtQty = result.qty ?? result.amount ?? 0;
+          const boughtItem = result.item ?? result.itemName ?? item;
+          const burned = result.burned ?? result.burnedMeal ?? 0;
+          const pool = result.pool ?? result.poolMeal ?? 0;
+
+          addLog(`Bought ${boughtQty}x ${boughtItem}. ${burned} $MEAL burned, ${pool} to pool.`);
         } catch (err) {
           const msg = err?.message || "shop_buy_failed";
+          const backendError = err?.data?.error || msg;
+
+          console.log("MCMEAL SHOP BUY ERROR:", err?.data || err);
+
           addLog(
-            msg === "not_enough_meal"
-              ? `Shop buy failed: not enough $MEAL for ${item}.`
-              : msg === "item_locked_coming_soon"
-                ? `${item} is coming soon. Hidden Menu utility is not active yet.`
-                : `Shop buy failed: ${msg}.`
+            backendError === "insufficient_kitchen_meal_balance"
+              ? `Shop buy failed: not enough Kitchen $MEAL for ${item}.`
+              : backendError === "not_meal_holder"
+                ? `Shop buy failed: wallet is not detected as $MEAL holder.`
+                : backendError === "unknown_shop_item"
+                  ? `Shop buy failed: unknown shop item ${item}.`
+                  : backendError === "item_locked_coming_soon"
+                    ? `${item} is coming soon. Hidden Menu utility is not active yet.`
+                    : `Shop buy failed: ${backendError}.`
           );
         }
+
         renderShopModal("buy");
       });
     });
@@ -1771,55 +1824,101 @@
   async function connectWalletAndSync(resultEl, hideStartAfterSuccess = false) {
     try {
       if (!window.solana || !window.solana.isPhantom) {
-        if (resultEl) resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
+        if (resultEl) {
+          resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
+        }
         return false;
       }
 
-      if (resultEl) resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking Kitchen access...</div>`;
+      if (resultEl) {
+        resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking $MEAL holder access...</div>`;
+      }
 
       const resp = await window.solana.connect({ onlyIfTrusted: false });
       const address = resp.publicKey.toString();
+
+      console.log("MCMEAL CONNECTED WALLET:", address);
 
       const access = await backendCall(BACKEND.endpoints.checkAccess, {
         walletAddress: address
       });
 
-      if (!access.allowed) {
+      console.log("MCMEAL CHECK ACCESS RESPONSE:", access);
+
+      const accessGranted = Boolean(
+        access.allowed === true ||
+        access.access === true ||
+        access.holder === true
+      );
+
+      if (!accessGranted) {
         state.wallet = null;
         state.prelaunchAccess = false;
         state.backendSynced = false;
         saveState();
-        if (resultEl) resultEl.innerHTML = accessDeniedMessage(address);
+
+        if (resultEl) {
+          resultEl.innerHTML = `
+            <div class="warning-box">
+              <strong>Access locked.</strong><br />
+              Wallet ${shortWallet(address)} is not detected as a $MEAL holder.<br />
+              Required: Hold at least 1 $MEAL.<br />
+              Detected balance: ${Number(access.balance || access.mealBalance || 0)} $MEAL<br /><br />
+              <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
+            </div>
+          `;
+        }
+
         return false;
       }
 
-      // v10.3: Do not call a public Solana RPC from the browser during connect.
-      // Holder balance is checked server-side by check-access. This prevents wallet connect from hanging
-      // when public RPC endpoints rate-limit/CORS-block browser requests.
-      let balance = Number(access.mealBalance || access.balance || MIN_MEAL_BALANCE);
-      let balanceText = access.mealBalance
-        ? `$MEAL balance found: ${access.mealBalance}`
-        : "Kitchen access granted. $MEAL holder access is active.";
+      const balance = Number(access.mealBalance ?? access.balance ?? 0);
 
       state.wallet = address;
       state.prelaunchAccess = true;
+      state.backendSynced = true;
+      state.accessTier = "Kitchen Access";
+
       saveState();
 
-      const profile = await backendCall(BACKEND.endpoints.profileConnect, {
-        walletAddress: address,
-        mealBalance: balance
-      });
-      syncBackendState(profile);
-      state.prelaunchAccess = true;
-      saveState();
+      let profile = null;
+
+      try {
+        profile = await backendCall(BACKEND.endpoints.profileConnect, {
+          walletAddress: address,
+          mealBalance: balance
+        });
+
+        console.log("MCMEAL PROFILE CONNECT RESPONSE:", profile);
+
+        syncBackendState(profile);
+
+        state.wallet = address;
+        state.prelaunchAccess = true;
+        state.backendSynced = true;
+
+        saveState();
+      } catch (profileErr) {
+        console.log("MCMEAL PROFILE CONNECT ERROR:", profileErr?.data || profileErr);
+
+        state.wallet = address;
+        state.prelaunchAccess = true;
+        state.backendSynced = true;
+        state.accessTier = "Kitchen Access";
+
+        saveState();
+
+        addLog(`Wallet holder access granted, but profile sync needs review: ${profileErr?.data?.error || profileErr?.message || "profile_connect_failed"}.`);
+      }
 
       if (resultEl) {
         resultEl.innerHTML = `
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
             <div class="wallet-row"><span>Access</span><strong>Kitchen Access</strong></div>
-            <div class="wallet-row"><span>Backend</span><strong>Synced</strong></div>
-            <div class="wallet-row"><span>Status</span><strong>${balanceText}</strong></div>
+            <div class="wallet-row"><span>$MEAL Holder</span><strong>Detected</strong></div>
+            <div class="wallet-row"><span>$MEAL Balance</span><strong>${balance}</strong></div>
+            <div class="wallet-row"><span>Backend</span><strong>${profile ? "Synced" : "Access granted, profile sync skipped"}</strong></div>
           </div>
         `;
       }
@@ -1829,17 +1928,30 @@
         if (start) start.classList.add("hidden");
       }
 
-      addLog(`Wallet synced: ${shortWallet(address)}.`);
+      addLog(`Wallet synced: ${shortWallet(address)} · $MEAL holder access granted.`);
+
       return true;
     } catch (err) {
       const msg = err?.message || "wallet_connection_failed";
+      const backendError = err?.data?.error || msg;
+
+      console.log("MCMEAL WALLET CONNECT ERROR:", err?.data || err);
+
       if (resultEl) {
-        if (msg === "access_locked_prelaunch" || err?.status === 403) {
-          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet does not have Kitchen access yet. Hold at least 10,000 $MEAL.<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>`;
+        if (backendError === "not_meal_holder" || backendError === "access_locked_prelaunch" || err?.status === 403) {
+          resultEl.innerHTML = `
+            <div class="warning-box">
+              <strong>Access locked.</strong><br />
+              This wallet does not have Kitchen access yet.<br />
+              Hold at least 1 $MEAL.<br /><br />
+              <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
+            </div>
+          `;
         } else {
-          resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${msg}</div>`;
+          resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${backendError}</div>`;
         }
       }
+
       return false;
     }
   }
@@ -1906,7 +2018,7 @@
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
           <h3>Wallet Connect</h3>
-          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. Use the official $MEAL link below.</p>
+          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>Hold 1 $MEAL</strong>. Use the official $MEAL link below.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
@@ -1924,8 +2036,8 @@
         <div class="modal-panel">
           <h3>Kitchen Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Access</strong> 10,000 $MEAL required</div>
-            <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
+            <div><strong>Access</strong> Hold at least 1 $MEAL</div>
+            <div><strong>Basic Kitchen</strong> Hold $MEAL</div>
             <div><strong>Grill Access</strong> 50,000 $MEAL</div>
             <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
             <div><strong>Legendary Kitchen</strong> 1,000,000 $MEAL</div>
