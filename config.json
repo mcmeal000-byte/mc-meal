@@ -1,5 +1,5 @@
 {
-  "SOLANA_RPC": "https://api.mainnet-beta.solana.com",
+  "SOLANA_RPC": "https://solana-rpc.publicnode.com",
   "MEAL_MINT": "EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "BUY_MEAL_URL": "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "REWARD_VAULT_WALLET": "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV",

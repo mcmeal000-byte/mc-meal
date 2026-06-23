@@ -169,7 +169,7 @@
   const MYSTERY_CRAFT_COST_MEAL = 500;
   const MYSTERY_CRAFT_BURN_MEAL = 450;
   const MYSTERY_CRAFT_POOL_MEAL = 50;
-  const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
+  const SOLANA_RPC_URL = "https://solana-rpc.publicnode.com";
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
@@ -1829,7 +1829,7 @@
 
   async function fetchMealBalance(walletAddress) {
     const cfg = await loadConfig();
-    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) cfg = { MEAL_MINT: OFFICIAL_MEAL_MINT, SOLANA_RPC: "https://api.mainnet-beta.solana.com" };
+    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) cfg = { MEAL_MINT: OFFICIAL_MEAL_MINT, SOLANA_RPC: "https://solana-rpc.publicnode.com" };
 
     const body = {
       jsonrpc: "2.0",
@@ -1842,7 +1842,7 @@
       ]
     };
 
-    const res = await fetch(cfg.SOLANA_RPC || "https://api.mainnet-beta.solana.com", {
+    const res = await fetch(cfg.SOLANA_RPC || "https://solana-rpc.publicnode.com", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
