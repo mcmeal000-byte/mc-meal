@@ -1,4 +1,4 @@
-// MC Meal Live v18 - profile usernames + leaderboard + payout foundation
+// MC Meal Live v18.1 - leaderboard modes / overall + per-game
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -191,7 +191,7 @@
   const LOAD_CREDITS_TREASURY_MEAL = 1000;
   const SOLANA_RPC_URL = ""; // Browser no longer calls public RPC for onchain payments. Server prepares tx.
   let activeGameRun = null;
-  let lastLeaderboardQuery = { period: "all_time", gameId: "all" };
+  let lastLeaderboardQuery = { mode: "overall", period: "all_time", gameId: "all" };
 
   const SHOP_ITEM_IDS = {
     Bun: "bun_pack",
@@ -2070,15 +2070,72 @@
     `);
   }
 
+  const LEADERBOARD_VIEWS = [
+    { mode: "overall", gameId: "all", label: "OVERALL", subtitle: "One row per chef · ranked by Chef XP" },
+    { mode: "game", gameId: "burger-stack", label: "BURGER", subtitle: "Burger Stack best score" },
+    { mode: "game", gameId: "fry-rush", label: "FRY", subtitle: "Fry Rush best score" },
+    { mode: "game", gameId: "soda-sprint", label: "SODA", subtitle: "Soda Sprint best score" },
+    { mode: "game", gameId: "mystery-order-rush", label: "MYSTERY", subtitle: "Mystery Order best score" },
+    { mode: "recent", gameId: "all", label: "RECENT", subtitle: "Raw run history" }
+  ];
+
+  function leaderboardActiveLabel() {
+    const found = LEADERBOARD_VIEWS.find(v => v.mode === lastLeaderboardQuery.mode && v.gameId === lastLeaderboardQuery.gameId);
+    return found ? found.label : "OVERALL";
+  }
+
+  function leaderboardRankIcon(index) {
+    if (index === 0) return "🏆";
+    if (index === 1) return "🥈";
+    if (index === 2) return "🥉";
+    return "⭐";
+  }
+
   function leaderboardRowHtml(row, index) {
     const name = row.username || shortWallet(row.wallet_address || "");
+    const mode = row.kind || lastLeaderboardQuery.mode || "overall";
     const game = row.game_name || row.game_id || "Mini Game";
     const date = row.created_at ? new Date(row.created_at).toLocaleDateString() : "";
+
+    if (mode === "overall") {
+      const xp = Number(row.chef_xp ?? row.xp ?? row.score ?? 0);
+      const best = Number(row.best_score || 0);
+      const runs = Number(row.total_arcade_runs || row.mini_runs || 0);
+      return `
+        <div class="item-row">
+          <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
+          <div><strong>#${index + 1} ${name}</strong><span>Chef XP ${xp.toLocaleString("en-US")} · Best ${best.toLocaleString("en-US")} · Runs ${runs.toLocaleString("en-US")}</span></div>
+          <strong>${xp.toLocaleString("en-US")} XP</strong>
+        </div>
+      `;
+    }
+
+    if (mode === "game") {
+      return `
+        <div class="item-row">
+          <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
+          <div><strong>#${index + 1} ${name}</strong><span>${game} · best run${date ? " · " + date : ""}</span></div>
+          <strong>${Number(row.score || 0).toLocaleString("en-US")}</strong>
+        </div>
+      `;
+    }
+
     return `
       <div class="item-row">
-        <div class="pixel-icon">${index === 0 ? "🏆" : index === 1 ? "🥈" : index === 2 ? "🥉" : "⭐"}</div>
-        <div><strong>#${index + 1} ${name}</strong><span>${game} · ${date}</span></div>
+        <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
+        <div><strong>#${index + 1} ${name}</strong><span>${game}${date ? " · " + date : ""}</span></div>
         <strong>${Number(row.score || 0).toLocaleString("en-US")}</strong>
+      </div>
+    `;
+  }
+
+  function leaderboardTabsHtml() {
+    return `
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 12px;">
+        ${LEADERBOARD_VIEWS.map(view => {
+          const active = view.mode === lastLeaderboardQuery.mode && view.gameId === lastLeaderboardQuery.gameId;
+          return `<button class="small-btn leaderboard-filter-btn" data-mode="${view.mode}" data-game-id="${view.gameId}" style="${active ? "border-color:#ffe25a; color:#ffe25a;" : ""}">${view.label}</button>`;
+        }).join("")}
       </div>
     `;
   }
@@ -2087,6 +2144,7 @@
     const rows = Array.isArray(state.leaderboardRows) ? state.leaderboardRows : [];
     const username = state.username || "";
     const shownName = username || shortWallet(state.wallet);
+    const activeView = LEADERBOARD_VIEWS.find(v => v.mode === lastLeaderboardQuery.mode && v.gameId === lastLeaderboardQuery.gameId) || LEADERBOARD_VIEWS[0];
 
     setContent(`
       <div class="modal-grid">
@@ -2099,7 +2157,7 @@
             <div class="item-row"><div class="pixel-icon">👤</div><div><strong>Username</strong><span>3-16 chars, letters/numbers/_</span></div><strong>${username || "Not set"}</strong></div>
             <div class="item-row"><div class="pixel-icon">👛</div><div><strong>Wallet</strong><span>Connected identity</span></div><strong>${shortWallet(state.wallet)}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Tier</strong><span>${state.mealTier?.badge || ""}</span></div><strong>${state.mealTier?.name || "Visitor"}</strong></div>
-            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${state.xp}</strong></div>
+            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${Number(state.xp || 0).toLocaleString("en-US")}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${Number(state.bestScore || 0).toLocaleString("en-US")}</strong></div>
           </div>
 
@@ -2129,10 +2187,11 @@
       <div class="modal-panel">
         <div class="season-badge">LEADERBOARD</div>
         <h3>🏆 Kitchen Leaderboard</h3>
-        <p>Scores saved from rewarded arcade runs. Soft validation now; stricter signed run sessions later.</p>
+        <p><strong>Overall</strong> ranks each chef once by total Chef XP. Use game filters for per-game highscores. Recent shows raw run history.</p>
+        ${leaderboardTabsHtml()}
         <div class="item-row">
           <div class="pixel-icon">📊</div>
-          <div><strong>View</strong><span>All games, all-time top scores</span></div>
+          <div><strong>${activeView.label}</strong><span>${activeView.subtitle}</span></div>
           <button class="small-btn" id="refreshLeaderboardBtn">REFRESH</button>
         </div>
         <div class="item-list" style="margin-top:12px;">
@@ -2166,27 +2225,42 @@
       });
     }
 
+    async function loadLeaderboardForCurrentView(message = "Leaderboard refreshed.") {
+      try {
+        const result = await backendCall(BACKEND.endpoints.leaderboardList, {
+          mode: lastLeaderboardQuery.mode,
+          period: lastLeaderboardQuery.period,
+          gameId: lastLeaderboardQuery.gameId,
+          limit: 10
+        });
+        state.leaderboardRows = result.leaderboard || [];
+        saveState();
+        renderLeaderboardModal(message);
+      } catch (err) {
+        const msg = err?.data?.error || err?.message || "leaderboard_load_failed";
+        console.log("MCMEAL LEADERBOARD ERROR:", err?.data || err);
+        renderLeaderboardModal(`Leaderboard failed: ${msg}.`);
+      }
+    }
+
+    document.querySelectorAll(".leaderboard-filter-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        lastLeaderboardQuery = {
+          ...lastLeaderboardQuery,
+          mode: btn.getAttribute("data-mode") || "overall",
+          gameId: btn.getAttribute("data-game-id") || "all"
+        };
+        await loadLeaderboardForCurrentView(`${leaderboardActiveLabel()} leaderboard loaded.`);
+      });
+    });
+
     const refreshBtn = document.getElementById("refreshLeaderboardBtn");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
-        try {
-          const result = await backendCall(BACKEND.endpoints.leaderboardList, {
-            period: lastLeaderboardQuery.period,
-            gameId: lastLeaderboardQuery.gameId,
-            limit: 10
-          });
-          state.leaderboardRows = result.leaderboard || [];
-          saveState();
-          renderLeaderboardModal("Leaderboard refreshed.");
-        } catch (err) {
-          const msg = err?.data?.error || err?.message || "leaderboard_load_failed";
-          console.log("MCMEAL LEADERBOARD ERROR:", err?.data || err);
-          renderLeaderboardModal(`Leaderboard failed: ${msg}.`);
-        }
+        await loadLeaderboardForCurrentView("Leaderboard refreshed.");
       });
     }
   }
-
 
   function renderDailyModal() {
     const today = window.MCMealSave ? window.MCMealSave.todayKey() : new Date().toISOString().slice(0, 10);
