@@ -246,6 +246,47 @@
   }
 
 
+  // v13.2: Used only for create-onchain-payment.
+  // Reason: some Supabase Edge Function gateways can still fail browser OPTIONS/preflight.
+  // A text/plain POST is CORS-safelisted and does not trigger preflight.
+  async function backendCallSimple(endpoint, payload, timeoutMs = 20000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${BACKEND.baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(payload || {}),
+        signal: controller.signal
+      });
+
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { ok: false, error: text || `backend_${res.status}` }; }
+
+      if (!res.ok || !data || !data.ok) {
+        const error = data?.error || `backend_${res.status}`;
+        const e = new Error(`${endpoint}: ${error}`);
+        e.status = res.status;
+        e.data = data;
+        throw e;
+      }
+
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const e = new Error(`${endpoint}: request_timeout`);
+        e.status = 408;
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+
   function requireSolanaWeb3() {
     if (!window.solanaWeb3) throw new Error("solana_web3_not_loaded");
     return window.solanaWeb3;
@@ -367,7 +408,7 @@
 
     const walletAddress = state.wallet;
 
-    const payment = await backendCall(BACKEND.endpoints.createPayment, {
+    const payment = await backendCallSimple(BACKEND.endpoints.createPayment, {
       walletAddress,
       actionType
     }, 20000);
