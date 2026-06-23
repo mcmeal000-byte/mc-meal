@@ -2,343 +2,92 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MC Meal - Kitchen Opening Soon</title>
-
-  <style>
-    :root {
-      --bg: #1f1419;
-      --panel: #0f1118;
-      --panel2: #171923;
-      --gold: #ffd45a;
-      --gold2: #ff9f38;
-      --cyan: #33ffe0;
-      --red: #ff5f4d;
-      --text: #fff1c7;
-      --muted: #c9b98a;
-      --border: #ffd45a;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100%;
-      background:
-        radial-gradient(circle at top, rgba(255, 212, 90, 0.08), transparent 35%),
-        linear-gradient(180deg, #24171d 0%, #0d0e14 100%);
-      color: var(--text);
-      font-family: "Courier New", monospace;
-    }
-
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 24px;
-      min-height: 100vh;
-    }
-
-    .frame {
-      width: min(980px, 100%);
-      border: 4px solid var(--border);
-      box-shadow:
-        0 0 0 4px #3b2229,
-        0 0 40px rgba(255, 212, 90, 0.15);
-      background: var(--bg);
-      padding: 18px;
-    }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      border: 2px solid var(--border);
-      padding: 14px 16px;
-      background: #21151b;
-      margin-bottom: 18px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .logo-box {
-      width: 64px;
-      height: 64px;
-      border: 3px solid var(--gold);
-      display: grid;
-      place-items: center;
-      background: #0b0d13;
-      color: var(--gold);
-      font-weight: 900;
-      font-size: 13px;
-      line-height: 1.1;
-      text-align: center;
-      box-shadow: inset 0 0 0 2px #3b2229;
-    }
-
-    h1 {
-      margin: 0;
-      color: var(--gold);
-      font-size: clamp(34px, 7vw, 72px);
-      letter-spacing: 4px;
-      text-shadow: 4px 4px 0 var(--gold2);
-      line-height: 0.9;
-    }
-
-    .subtitle {
-      margin-top: 8px;
-      color: var(--text);
-      font-size: 14px;
-      letter-spacing: 1px;
-    }
-
-    .tag {
-      border: 3px solid var(--cyan);
-      color: var(--cyan);
-      padding: 10px 14px;
-      font-size: 13px;
-      white-space: nowrap;
-      background: rgba(51, 255, 224, 0.08);
-    }
-
-    .main {
-      border: 3px solid var(--border);
-      background:
-        linear-gradient(135deg, rgba(255, 212, 90, 0.05), transparent 40%),
-        var(--panel);
-      padding: clamp(22px, 5vw, 48px);
-      text-align: center;
-      min-height: 520px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .main::before {
-      content: "";
-      position: absolute;
-      inset: 20px;
-      border: 1px dashed rgba(255, 212, 90, 0.22);
-      pointer-events: none;
-    }
-
-    .badge {
-      display: inline-block;
-      margin: 0 auto 22px;
-      border: 2px solid var(--cyan);
-      color: var(--cyan);
-      padding: 8px 16px;
-      font-weight: bold;
-      background: rgba(51, 255, 224, 0.08);
-      position: relative;
-      z-index: 2;
-    }
-
-    .headline {
-      position: relative;
-      z-index: 2;
-      margin: 0;
-      font-size: clamp(34px, 6vw, 62px);
-      color: var(--gold);
-      text-shadow: 4px 4px 0 var(--gold2);
-      letter-spacing: 3px;
-    }
-
-    .lead {
-      position: relative;
-      z-index: 2;
-      max-width: 720px;
-      margin: 26px auto 0;
-      font-size: clamp(16px, 2.5vw, 22px);
-      line-height: 1.6;
-      color: var(--text);
-    }
-
-    .notice {
-      position: relative;
-      z-index: 2;
-      max-width: 720px;
-      margin: 28px auto 0;
-      border-left: 8px solid var(--red);
-      background: rgba(255, 95, 77, 0.10);
-      padding: 18px 20px;
-      color: #ffd6cf;
-      line-height: 1.5;
-      font-size: 15px;
-    }
-
-    .steps {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 30px;
-    }
-
-    .step {
-      border: 2px solid var(--gold);
-      color: var(--gold);
-      padding: 10px 14px;
-      background: rgba(255, 212, 90, 0.06);
-      font-weight: bold;
-      font-size: 14px;
-    }
-
-    .buttons {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 14px;
-      margin-top: 34px;
-    }
-
-    .btn {
-      display: inline-block;
-      text-decoration: none;
-      color: var(--cyan);
-      border: 3px solid var(--cyan);
-      padding: 14px 22px;
-      font-weight: bold;
-      background: rgba(51, 255, 224, 0.08);
-      box-shadow: 4px 4px 0 rgba(51, 255, 224, 0.25);
-      transition: transform 0.1s ease;
-    }
-
-    .btn:hover {
-      transform: translate(-2px, -2px);
-    }
-
-    .btn.disabled {
-      color: var(--muted);
-      border-color: var(--muted);
-      box-shadow: 4px 4px 0 rgba(201, 185, 138, 0.18);
-      pointer-events: none;
-      opacity: 0.7;
-    }
-
-    .footer {
-      margin-top: 18px;
-      border: 2px solid var(--border);
-      padding: 12px 14px;
-      color: var(--gold);
-      font-size: 13px;
-      line-height: 1.5;
-      background: #21151b;
-    }
-
-    .small {
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 16px;
-      position: relative;
-      z-index: 2;
-    }
-
-    @media (max-width: 640px) {
-      body {
-        padding: 12px;
-      }
-
-      .frame {
-        padding: 10px;
-      }
-
-      .topbar {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .brand {
-        align-items: flex-start;
-      }
-
-      .logo-box {
-        width: 52px;
-        height: 52px;
-        font-size: 11px;
-      }
-
-      .tag {
-        width: 100%;
-        text-align: center;
-      }
-
-      .main {
-        min-height: auto;
-      }
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>MC Meal – Kitchen Economy</title>
+  <link rel="stylesheet" href="style.css?v=live-v10-onchain-burn" />
 </head>
-
 <body>
-  <div class="frame">
-    <header class="topbar">
-      <div class="brand">
-        <div class="logo-box">MC<br>MEAL</div>
-        <div>
-          <h1>MC MEAL</h1>
-          <div class="subtitle">Kitchen Economy</div>
+  <main class="shell">
+    <section class="game-frame">
+      <div class="brandbar">
+        <div class="brand">
+          <img class="brand-logo" src="assets/mc-meal-logo.png" alt="MC Meal Logo" />
+          <div>
+            <h1>MC MEAL</h1>
+            <p>Kitchen Economy</p>
+          </div>
+        </div>
+        <div class="chain-pill">Solana · $MEAL</div>
+      </div>
+
+      
+      <div id="startScreen" class="start-screen">
+        <div class="start-card">
+          <div class="start-kicker">Kitchen Access</div>
+          <h2>MC MEAL</h2>
+          <p class="start-tagline">Cook. Craft. Level Up.</p>
+
+          <div class="start-loop">
+            <span>Play</span>
+            <b>→</b>
+            <span>Collect</span>
+            <b>→</b>
+            <span>Craft</span>
+            <b>→</b>
+            <span>Sell / Upgrade</span>
+          </div>
+
+          <div class="start-actions">
+            <button id="enterKitchenBtn" class="primary-start">CONNECT WALLET</button>
+            <a class="secondary-start buy-meal-link" href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
+            <button id="howItWorksBtn" class="secondary-start">HOW IT WORKS</button>
+          </div>
+
+          <div id="accessResult" style="margin:14px auto 0; max-width:560px;"></div>
+
+          <div id="howItWorksBox" class="how-box hidden">
+            Connect your Phantom wallet to enter the Kitchen. Hold at least 10,000 $MEAL for holder access. Official $MEAL link is available through the BUY $MEAL button.
+          </div>
+
+          <div class="start-note">
+            Play mini-games, collect ingredients, craft meals and build progression through the official $MEAL economy.
+          </div>
         </div>
       </div>
 
-      <div class="tag">Solana · $MEAL</div>
-    </header>
+      <canvas id="hub" width="960" height="640"></canvas>
 
-    <main class="main">
-      <div class="badge">Kitchen Opening Soon</div>
-
-      <h2 class="headline">THE KITCHEN IS ALMOST READY</h2>
-
-      <p class="lead">
-        $MEAL will launch first. Game access will officially open after the launch update.
-        All official links, token address and game access updates will be posted only through the official MC Meal account.
-      </p>
-
-      <div class="steps">
-        <div class="step">Play</div>
-        <div class="step">Collect</div>
-        <div class="step">Craft</div>
-        <div class="step">Level Up</div>
+      <div class="mobile-controls">
+        <div class="mobile-stick-area" id="mobileStickArea" aria-label="Movement joystick">
+          <div class="mobile-stick-base">
+            <div class="mobile-stick-knob" id="mobileStickKnob"></div>
+          </div>
+          <div class="mobile-stick-label">MOVE</div>
+        </div>
+        <button class="enter-btn" data-key="Enter">ENTER</button>
       </div>
 
-      <div class="notice">
-        No official token link is live until it is posted by <strong>@MCMealonSOL</strong>.
-        Please be careful with fake links, fake tokens and unofficial accounts.
+      <div class="help-line">
+        <strong>Kitchen:</strong> Connect Phantom wallet · <strong>Move:</strong> WASD / Arrow Keys · <strong>Open:</strong> Enter.
       </div>
+    </section>
+  </main>
 
-      <div class="buttons">
-        <a class="btn" href="https://x.com/MCMealonSOL" target="_blank" rel="noopener noreferrer">
-          FOLLOW OFFICIAL X
-        </a>
-
-        <a class="btn disabled" href="#">
-          ENTER KITCHEN SOON
-        </a>
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle">Station</h2>
+          <p id="modalSubtitle">MC Meal Kitchen</p>
+        </div>
+        <button id="closeModal" class="close-btn">X</button>
       </div>
-
-      <div class="small">
-        Cook. Craft. Level Up. · MC Meal on Solana
-      </div>
-    </main>
-
-    <footer class="footer">
-      Official updates: https://x.com/MCMealonSOL
-    </footer>
+      <div id="modalContent" class="modal-content"></div>
+    </div>
   </div>
+
+  <script src="https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+  <script src="shared/mcmeal-save.js?v=live-v10-onchain-burn"></script>
+  <script src="hub.js?v=live-v10-onchain-burn"></script>
 </body>
 </html>

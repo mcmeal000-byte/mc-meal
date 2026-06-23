@@ -1,4 +1,4 @@
-// MC Meal Live Fix v7 Final UI - arcade gating + close buttons + layout polish
+// MC Meal Live v9 - $MEAL live holder access + buy links
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -158,6 +158,18 @@
   };
 
   const EXTRA_REWARDED_RUN_COST = 250;
+  const OFFICIAL_MEAL_MINT = "EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump";
+  const OFFICIAL_BUY_MEAL_URL = "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump";
+  const REWARD_VAULT_WALLET = "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV";
+  const TREASURY_WALLET = "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR";
+  const MIN_MEAL_BALANCE = 10000;
+  const TOKEN_DECIMALS = 6;
+  const EXTRA_RUN_BURN_MEAL = 200;
+  const EXTRA_RUN_POOL_MEAL = 50;
+  const MYSTERY_CRAFT_COST_MEAL = 500;
+  const MYSTERY_CRAFT_BURN_MEAL = 450;
+  const MYSTERY_CRAFT_POOL_MEAL = 50;
+  const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
@@ -192,6 +204,165 @@
       throw e;
     }
     return data;
+  }
+
+
+  function requireSolanaWeb3() {
+    if (!window.solanaWeb3) throw new Error("solana_web3_not_loaded");
+    return window.solanaWeb3;
+  }
+
+  function getPhantomProvider() {
+    const provider = window.solana;
+    if (!provider || !provider.isPhantom) throw new Error("phantom_not_found");
+    return provider;
+  }
+
+  function amountToRaw(amountMeal) {
+    return BigInt(Math.round(Number(amountMeal) * Math.pow(10, TOKEN_DECIMALS)));
+  }
+
+  function u64LeBytes(value) {
+    let n = BigInt(value);
+    const out = new Uint8Array(8);
+    for (let i = 0; i < 8; i++) {
+      out[i] = Number(n & 255n);
+      n >>= 8n;
+    }
+    return out;
+  }
+
+  function buildCheckedTokenData(instructionIndex, amountMeal) {
+    const amount = amountToRaw(amountMeal);
+    const out = new Uint8Array(10);
+    out[0] = instructionIndex;
+    out.set(u64LeBytes(amount), 1);
+    out[9] = TOKEN_DECIMALS;
+    return out;
+  }
+
+  async function getAssociatedTokenAddress(owner, mint) {
+    const web3 = requireSolanaWeb3();
+    const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    const ASSOCIATED_TOKEN_PROGRAM_ID = new web3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+    const [ata] = await web3.PublicKey.findProgramAddress(
+      [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    return ata;
+  }
+
+  function createAssociatedTokenAccountInstruction(payer, ata, owner, mint) {
+    const web3 = requireSolanaWeb3();
+    const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    const ASSOCIATED_TOKEN_PROGRAM_ID = new web3.PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+    const SYSVAR_RENT_PUBKEY = new web3.PublicKey("SysvarRent111111111111111111111111111111111");
+    return new web3.TransactionInstruction({
+      programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+      keys: [
+        { pubkey: payer, isSigner: true, isWritable: true },
+        { pubkey: ata, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }
+      ],
+      data: new Uint8Array([])
+    });
+  }
+
+  function createBurnCheckedInstruction(sourceTokenAccount, mint, owner, amountMeal) {
+    const web3 = requireSolanaWeb3();
+    const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    return new web3.TransactionInstruction({
+      programId: TOKEN_PROGRAM_ID,
+      keys: [
+        { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: true, isWritable: false }
+      ],
+      data: buildCheckedTokenData(15, amountMeal)
+    });
+  }
+
+  function createTransferCheckedInstruction(sourceTokenAccount, mint, destinationTokenAccount, owner, amountMeal) {
+    const web3 = requireSolanaWeb3();
+    const TOKEN_PROGRAM_ID = new web3.PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    return new web3.TransactionInstruction({
+      programId: TOKEN_PROGRAM_ID,
+      keys: [
+        { pubkey: sourceTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: destinationTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: true, isWritable: false }
+      ],
+      data: buildCheckedTokenData(12, amountMeal)
+    });
+  }
+
+  async function findUserMealTokenAccount(connection, owner, mint) {
+    const accounts = await connection.getParsedTokenAccountsByOwner(owner, { mint });
+    if (!accounts.value.length) throw new Error("meal_token_account_not_found");
+    let best = null;
+    let bestAmount = 0;
+    for (const row of accounts.value) {
+      const uiAmount = Number(row.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0);
+      if (!best || uiAmount > bestAmount) {
+        best = row.pubkey;
+        bestAmount = uiAmount;
+      }
+    }
+    return best;
+  }
+
+  async function payMealOnchain(actionType) {
+    const web3 = requireSolanaWeb3();
+    const provider = getPhantomProvider();
+    if (!state.wallet) throw new Error("wallet_not_connected");
+    if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
+      await provider.connect({ onlyIfTrusted: false });
+    }
+
+    const payer = new web3.PublicKey(state.wallet);
+    const mint = new web3.PublicKey(OFFICIAL_MEAL_MINT);
+    const rewardOwner = new web3.PublicKey(REWARD_VAULT_WALLET);
+    const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
+
+    const plan = actionType === "mystery_craft"
+      ? { burnMeal: MYSTERY_CRAFT_BURN_MEAL, rewardMeal: MYSTERY_CRAFT_POOL_MEAL, totalMeal: MYSTERY_CRAFT_COST_MEAL, label: "Mystery Craft" }
+      : { burnMeal: EXTRA_RUN_BURN_MEAL, rewardMeal: EXTRA_RUN_POOL_MEAL, totalMeal: EXTRA_REWARDED_RUN_COST, label: "Extra Reward Run" };
+
+    addLog(`${plan.label}: opening Phantom for ${plan.burnMeal} $MEAL burn + ${plan.rewardMeal} $MEAL Reward Vault.`);
+
+    const sourceTokenAccount = await findUserMealTokenAccount(connection, payer, mint);
+    const rewardAta = await getAssociatedTokenAddress(rewardOwner, mint);
+    const tx = new web3.Transaction();
+
+    const rewardAtaInfo = await connection.getAccountInfo(rewardAta, "confirmed");
+    if (!rewardAtaInfo) {
+      tx.add(createAssociatedTokenAccountInstruction(payer, rewardAta, rewardOwner, mint));
+    }
+
+    tx.add(createBurnCheckedInstruction(sourceTokenAccount, mint, payer, plan.burnMeal));
+    tx.add(createTransferCheckedInstruction(sourceTokenAccount, mint, rewardAta, payer, plan.rewardMeal));
+
+    const latest = await connection.getLatestBlockhash("confirmed");
+    tx.feePayer = payer;
+    tx.recentBlockhash = latest.blockhash;
+
+    const response = await provider.signAndSendTransaction(tx);
+    const signature = typeof response === "string" ? response : response.signature;
+    if (!signature) throw new Error("missing_transaction_signature");
+
+    await connection.confirmTransaction({
+      signature,
+      blockhash: latest.blockhash,
+      lastValidBlockHeight: latest.lastValidBlockHeight
+    }, "confirmed");
+
+    addLog(`${plan.label}: onchain transaction confirmed.`);
+    return signature;
   }
 
   function syncBackendState(data) {
@@ -255,9 +426,10 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN ACCESS LOCKED</div>
         <h3>Connect wallet to enter the Kitchen</h3>
-        <p>The Kitchen uses wallet access. Connect Phantom to sync your profile, runs, rewards and crafting.</p>
+        <p>The Kitchen uses $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting. Minimum holder access: 10,000 $MEAL.</p>
         <div class="roadmap">
-          <div><strong>Access:</strong> wallet required</div>
+          <div><strong>Access:</strong> 10,000 $MEAL required</div>
+          <div class="official-link-box"><strong>Official $MEAL:</strong><br />EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>
           <div><strong>Token:</strong> $MEAL economy</div>
           <div><strong>Holder gate:</strong> minimum $MEAL balance</div>
         </div>
@@ -903,7 +1075,7 @@
       <div class="modal-panel">
         <div class="season-badge">RUN ECONOMY</div>
         <h3>Daily Rewarded Runs</h3>
-        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Extra rewarded runs are capped at <strong>20 per wallet/day</strong> to protect the kitchen economy.</p>
+        <p>Each verified holder gets <strong>1 free rewarded run per mini-game per day</strong>. After the daily free run is used, every extra rewarded run costs <strong>${EXTRA_REWARDED_RUN_COST} $MEAL</strong>. Extra rewarded runs use a real onchain action: <strong>200 $MEAL burn + 50 $MEAL Reward Vault</strong>. Capped at <strong>20 per wallet/day</strong>.</p>
       </div>
 
       ${noticeHtml}
@@ -936,7 +1108,7 @@
     return "Daily Free Reward Run";
   }
 
-  function openRealGame(src, gameName, runMode = "free") {
+  async function openRealGame(src, gameName, runMode = "free") {
     if (!requireWallet("mini-games")) return;
 
     if (runMode === "free" && isFreeRunUsed(gameName)) {
@@ -945,16 +1117,37 @@
       return;
     }
 
+    let paymentSignature = null;
+    if (runMode === "paid") {
+      const preflightId = `preflight-${gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
+      try {
+        await backendCall(BACKEND.endpoints.submitRun, {
+          walletAddress: state.wallet,
+          gameKey: gameName,
+          clientRunId: preflightId,
+          runMode: "paid",
+          preflight: true
+        });
+        paymentSignature = await payMealOnchain("extra_run");
+      } catch (err) {
+        const msg = err?.message || "payment_failed";
+        addLog(`Extra Reward Run not started: ${msg}.`);
+        renderArcadeModal(`<strong>Extra Reward Run failed:</strong> ${msg}. No game started.`);
+        return;
+      }
+    }
+
     activeGameRun = {
       gameName,
       runMode,
-      startedAt: Date.now()
+      startedAt: Date.now(),
+      paymentSignature
     };
 
     setModalHeader(gameName, runModeLabel(runMode));
 
     const noteText = runMode === "paid"
-      ? `Extra rewarded run active. If the result is submitted successfully, ${EXTRA_REWARDED_RUN_COST} $MEAL is charged by the backend.`
+      ? `Extra rewarded run active. Onchain payment confirmed: ${EXTRA_RUN_BURN_MEAL} $MEAL burned + ${EXTRA_RUN_POOL_MEAL} $MEAL sent to Reward Vault.`
       : "Daily free rewarded run active. This game can reward only once for free today.";
 
     setContent(`
@@ -963,7 +1156,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-fix-v8-launch-clean" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-v10-onchain-burn" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -975,7 +1168,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-fix-v8-launch-clean`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-onchain-burn`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1011,12 +1204,13 @@
         clientRunId,
         runMode: runInfo.runMode === "paid" ? "paid" : "free",
         entryCostMeal: runInfo.runMode === "paid" ? EXTRA_REWARDED_RUN_COST : 0,
+        paymentSignature: runInfo.paymentSignature || null,
         drops: dropObjects
       });
 
       syncBackendState(result);
       if (result.runType !== "paid") markFreeRunUsed(gameKey);
-      const runTypeText = result.runType === "paid" ? `Extra run paid: ${result.entryCostMeal || EXTRA_REWARDED_RUN_COST} $MEAL` : "Daily free run used";
+      const runTypeText = result.runType === "paid" ? `Extra run onchain: ${result.burnedMeal || EXTRA_RUN_BURN_MEAL} burned + ${result.poolMeal || EXTRA_RUN_POOL_MEAL} to Reward Vault` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
 
       if (note) {
@@ -1072,7 +1266,7 @@
         icon: "🎁",
         name: "Mystery Meal Attempt",
         resultItem: "Mystery Meal",
-        description: "Costs 500 $MEAL. Max 3 Mystery Meal attempts per wallet/day. Odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
+        description: "Onchain cost: 450 $MEAL burned + 50 $MEAL to Reward Vault. Max 3 Mystery Meal attempts per wallet/day. Odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
         costMeal: 500,
         burnRate: 0.9,
         requirements: [["Bun",1],["Patty",1],["Cheese",1],["Fries",1],["Soda",1],["Sauce",1],["Mystery Ticket",1]]
@@ -1225,15 +1419,28 @@
       return;
     }
 
+    let paymentSignature = null;
+
     try {
+      if (type === "mystery") {
+        await backendCall(BACKEND.endpoints.craft, {
+          walletAddress: state.wallet,
+          recipeId: type,
+          preflight: true
+        });
+        paymentSignature = await payMealOnchain("mystery_craft");
+      }
+
       const result = await backendCall(BACKEND.endpoints.craft, {
         walletAddress: state.wallet,
-        recipeId: type
+        recipeId: type,
+        paymentSignature
       });
       syncBackendState(result);
       const craftedName = result.recipeName || type;
       const craftedXp = result.xpEarned ?? result.xp ?? 0;
-      addLog(`Crafted ${craftedName} → ${result.resultItem}. +${craftedXp} XP.`);
+      const onchainText = result.onchainVerified ? ` · Onchain: ${result.burned || 0} burned + ${result.pool || 0} to Reward Vault` : "";
+      addLog(`Crafted ${craftedName} → ${result.resultItem}. +${craftedXp} XP.${onchainText}`);
     } catch (err) {
       const msg = err?.message || "craft_failed";
       if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
@@ -1449,7 +1656,7 @@
           <div class="item-list">
             <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${state.xp}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${state.bestScore}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>$MEAL Burned</strong><span>Shop/craft burn</span></div><strong>${state.burned}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>$MEAL Burned</strong><span>Onchain/game burn</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Meals Crafted</strong><span>Total crafted meals</span></div><strong>${state.mealsCrafted}</strong></div>
           </div>
         </div>
@@ -1564,13 +1771,13 @@
       }
 
       let balance = null;
-      let balanceText = "Kitchen access granted. $MEAL holder check will activate for public access.";
+      let balanceText = "Kitchen access granted. $MEAL holder access is active.";
 
       try {
         balance = await fetchMealBalance(address);
         if (balance !== null) balanceText = `$MEAL balance found: ${balance}`;
       } catch (e) {
-        balanceText = "Kitchen access granted. $MEAL economy is ready for holder access.";
+        balanceText = "Kitchen access granted. $MEAL economy is live.";
       }
 
       state.wallet = address;
@@ -1607,7 +1814,7 @@
       const msg = err?.message || "wallet_connection_failed";
       if (resultEl) {
         if (msg === "access_locked_prelaunch" || err?.status === 403) {
-          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet does not have Kitchen access yet.</div>`;
+          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet does not have Kitchen access yet. Hold at least 10,000 $MEAL.<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>`;
         } else {
           resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${msg}</div>`;
         }
@@ -1622,7 +1829,7 @@
 
   async function fetchMealBalance(walletAddress) {
     const cfg = await loadConfig();
-    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) return null;
+    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) cfg = { MEAL_MINT: OFFICIAL_MEAL_MINT, SOLANA_RPC: "https://api.mainnet-beta.solana.com" };
 
     const body = {
       jsonrpc: "2.0",
@@ -1671,30 +1878,32 @@
     setContent(`
       <div class="big-cta">
         <div>MC MEAL KITCHEN</div>
-        <div>Backend-synced kitchen economy · wallet access ready</div>
+        <div>Backend-synced kitchen economy · $MEAL live</div>
       </div>
 
       <div class="modal-grid">
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
           <h3>Wallet Connect</h3>
-          <p>Connect Phantom to open the Kitchen. $MEAL holder access powers the full game economy.</p>
+          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. Use the official $MEAL link below.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
             <div class="wallet-row"><span>Access Tier</span><strong>${tier}</strong></div>
             <div class="wallet-row"><span>Backend Sync</span><strong>Active after connect</strong></div>
+            <div class="wallet-row"><span>Official Mint</span><strong style="overflow-wrap:anywhere;">EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump</strong></div>
           </div>
 
           <br />
           <button class="action-btn" id="connectWalletBtn">CONNECT PHANTOM</button>
+          <a class="small-btn gold" href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;margin-top:10px;">BUY $MEAL</a>
           <div id="walletResult" style="margin-top:12px;"></div>
         </div>
 
         <div class="modal-panel">
           <h3>Kitchen Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Access</strong> Wallet required</div>
+            <div><strong>Access</strong> 10,000 $MEAL required</div>
             <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
             <div><strong>Grill Access</strong> 50,000 $MEAL</div>
             <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
@@ -1708,6 +1917,7 @@
           <h3>Backend Status</h3>
           <div class="roadmap">
             <div>Wallet profile sync: live</div>
+            <div>Official $MEAL mint: EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump</div>
             <div>Daily claim per wallet: live</div>
             <div>Run submit API with duplicate protection: live</div>
             <div>Craft + shop verification: live</div>

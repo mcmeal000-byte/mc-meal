@@ -926,3 +926,19 @@ canvas {
 .small-btn.red{border-color:#e95d45;color:#ff9d8b;}
 .disabled-like{opacity:.6;cursor:not-allowed;}
 button:disabled{opacity:.6;cursor:not-allowed;}
+
+
+/* v9 live $MEAL link polish */
+.buy-meal-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.official-link-box {
+  border: 2px solid rgba(255, 206, 74, .9);
+  background: rgba(255, 206, 74, .08);
+  padding: 10px 12px;
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
