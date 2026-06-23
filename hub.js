@@ -159,6 +159,7 @@
       profileConnect: "/profile-connect",
       dailyClaim: "/daily-claim",
       submitRun: "/submit-run",
+      kitchenState: "/kitchen-state",
       craft: "/craft",
       shopBuy: "/shop-buy-demo",
       shopSell: "/shop-sell-demo",
@@ -628,16 +629,20 @@
       mealsCrafted: 0,
       miniRuns: 0,
       inventory: {
-        Bun: 6,
-        Patty: 5,
-        Cheese: 4,
-        Lettuce: 4,
-        Fries: 5,
-        Soda: 5,
-        Sauce: 4,
-        "Mystery Ticket": 2,
-        "Recipe Fragment": 1,
-        "Common Meal": 1,
+        Bun: 0,
+        Patty: 0,
+        Cheese: 0,
+        Lettuce: 0,
+        Fries: 0,
+        Soda: 0,
+        Sauce: 0,
+        "Mystery Ticket": 0,
+        "Recipe Fragment": 0,
+        "Craft Entry": 0,
+        "Basic Burger": 0,
+        "Classic MC Meal": 0,
+        "Kitchen Scrap": 0,
+        "Common Meal": 0,
         "Rare Meal": 0,
         "Supreme Meal": 0,
         "Legendary Meal": 0,
@@ -677,6 +682,56 @@
       if (state.log.length > 8) state.log = state.log.slice(-8);
     }
     saveState();
+  }
+
+  function resetWalletScopedLocalState(nextWallet) {
+    state.wallet = nextWallet || state.wallet || null;
+    state.inventory = {
+      Bun: 0,
+      Patty: 0,
+      Cheese: 0,
+      Lettuce: 0,
+      Fries: 0,
+      Soda: 0,
+      Sauce: 0,
+      "Mystery Ticket": 0,
+      "Recipe Fragment": 0,
+      "Craft Entry": 0,
+      "Basic Burger": 0,
+      "Classic MC Meal": 0,
+      "Kitchen Scrap": 0,
+      "Common Meal": 0,
+      "Rare Meal": 0,
+      "Supreme Meal": 0,
+      "Legendary Meal": 0,
+      "Golden Meal": 0
+    };
+    state.streak = null;
+    state.rewardedRuns = { day: null, freeUsed: {} };
+    state.xp = 0;
+    state.meal = 0;
+    state.bestScore = 0;
+    state.miniRuns = 0;
+    state.mealsCrafted = 0;
+    saveState();
+  }
+
+  async function syncKitchenState(reason = "manual") {
+    if (!state.wallet || !state.backendSynced) return null;
+
+    try {
+      const result = await backendCall(BACKEND.endpoints.kitchenState, {
+        walletAddress: state.wallet,
+        reason
+      });
+
+      syncBackendState(result);
+      saveState();
+      return result;
+    } catch (err) {
+      console.log("MCMEAL KITCHEN STATE SYNC ERROR:", err?.data || err);
+      return null;
+    }
   }
 
   function todayKey() {
@@ -1184,7 +1239,14 @@
     if (id === "arcade") renderArcadeModal();
     else if (id === "craft") renderCraftModal();
     else if (id === "shop") renderShopModal();
-    else if (id === "fridge") renderInventoryModal();
+    else if (id === "fridge") {
+      renderInventoryModal();
+      syncKitchenState("fridge_open").then(() => {
+        if (modalOpen && document.getElementById("modalTitle")?.textContent === "FRIDGE") {
+          renderInventoryModal();
+        }
+      });
+    }
     else if (id === "leaderboard") renderLeaderboardModal();
     else if (id === "daily") renderDailyModal();
     else if (id === "launch") renderLaunchModal();
@@ -1283,6 +1345,28 @@
       return;
     }
 
+    if (runMode === "free") {
+      const preflightId = `free-preflight-${gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
+      try {
+        await backendCall(BACKEND.endpoints.submitRun, {
+          walletAddress: state.wallet,
+          gameKey: gameName,
+          clientRunId: preflightId,
+          runMode: "free",
+          preflight: true
+        });
+      } catch (err) {
+        const msg = err?.data?.error || err?.message || "free_run_preflight_failed";
+        if (msg === "free_run_already_used") {
+          markFreeRunUsed(gameName);
+          addLog(`${gameName}: daily free rewarded run already used today.`);
+          renderArcadeModal(`The free rewarded run for <strong>${gameName}</strong> was already used today. Start the <strong>Extra Reward Run</strong> for ${EXTRA_REWARDED_RUN_COST} $MEAL to keep earning rewards.`);
+          return;
+        }
+        console.log("MCMEAL FREE RUN PREFLIGHT SKIPPED:", err?.data || err);
+      }
+    }
+
     let paymentSignature = null;
     if (runMode === "paid") {
       const preflightId = `preflight-${gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
@@ -1376,22 +1460,23 @@
 
       syncBackendState(result);
 
-      // v16: Some submit-run responses save rewards on the backend but do not return a full inventory snapshot.
-      // In that case we mirror the accepted drops locally so the Fridge updates immediately without needing
-      // to open Shop first. The next backend response with inventory remains the source of truth and will overwrite it.
-      if (!Array.isArray(result.inventory)) {
-        const savedDrops = Array.isArray(result.drops) && result.drops.length ? result.drops : dropObjects;
-        for (const drop of savedDrops) {
-          const dropItem = drop?.item;
-          const dropQty = Number(drop?.qty || 1);
-          if (dropItem && Number.isFinite(dropQty) && dropQty > 0) {
-            give(dropItem, dropQty);
-          }
+      const savedDrops = Array.isArray(result.drops) && result.drops.length ? result.drops : dropObjects;
+
+      // v17.1: Always mirror the accepted drops locally after a successful backend save.
+      // If the backend response also contains a full inventory snapshot, the next kitchen-state sync below
+      // will keep the server as source of truth. This makes the Fridge update immediately after arcade rewards.
+      for (const drop of savedDrops) {
+        const dropItem = drop?.item;
+        const dropQty = Number(drop?.qty || 1);
+        if (dropItem && Number.isFinite(dropQty) && dropQty > 0) {
+          give(dropItem, dropQty);
         }
-        saveState();
       }
+      saveState();
 
       if (result.runType !== "paid") markFreeRunUsed(gameKey);
+
+      await syncKitchenState("arcade_reward_saved");
       const runTypeText = result.runType === "paid" ? `Extra run onchain: ${result.burnedMeal || EXTRA_RUN_BURN_MEAL} burned + ${result.poolMeal || EXTRA_RUN_POOL_MEAL} to Reward Vault` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
 
@@ -2054,8 +2139,14 @@
 
       const resp = await window.solana.connect({ onlyIfTrusted: false });
       const address = resp.publicKey.toString();
+      const previousWallet = state.wallet || null;
 
       console.log("MCMEAL CONNECTED WALLET:", address);
+
+      if (previousWallet && previousWallet !== address) {
+        addLog(`Wallet switched: ${shortWallet(previousWallet)} → ${shortWallet(address)}. Local wallet-scoped state reset before backend sync.`);
+        resetWalletScopedLocalState(address);
+      }
 
       const access = await backendCall(BACKEND.endpoints.checkAccess, {
         walletAddress: address
@@ -2134,15 +2225,24 @@
       }
 
       if (resultEl) {
-        resultEl.innerHTML = `
-          <div class="wallet-card">
-            <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
-            <div class="wallet-row"><span>Access Tier</span><strong>${tier.name}</strong></div>
-            <div class="wallet-row"><span>Badge</span><strong>${tier.badge}</strong></div>
-            <div class="wallet-row"><span>$MEAL Balance</span><strong>${formatMealAmount(balance)}</strong></div>
-            <div class="wallet-row"><span>Backend</span><strong>${profile ? "Synced" : "Access granted, profile sync skipped"}</strong></div>
-          </div>
-        `;
+        if (resultEl.id === "walletResult") {
+          resultEl.innerHTML = `<div class="station-status">Wallet refreshed. Updating Kitchen Access view...</div>`;
+          setTimeout(() => {
+            if (modalOpen && document.getElementById("modalTitle")?.textContent === "LAUNCH") {
+              renderLaunchModal();
+            }
+          }, 50);
+        } else {
+          resultEl.innerHTML = `
+            <div class="wallet-card">
+              <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
+              <div class="wallet-row"><span>Access Tier</span><strong>${tier.name}</strong></div>
+              <div class="wallet-row"><span>Badge</span><strong>${tier.badge}</strong></div>
+              <div class="wallet-row"><span>$MEAL Balance</span><strong>${formatMealAmount(balance)}</strong></div>
+              <div class="wallet-row"><span>Backend</span><strong>${profile ? "Synced" : "Access granted, profile sync skipped"}</strong></div>
+            </div>
+          `;
+        }
       }
 
       if (hideStartAfterSuccess) {
