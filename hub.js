@@ -144,6 +144,14 @@
 
   let state = window.MCMealSave ? window.MCMealSave.load() : loadState();
 
+  // v10.2 safety: never trust a stale local wallet cache as live access.
+  // The Kitchen opens only after check-access + profile-connect succeed in this session.
+  if (state.wallet && state.prelaunchAccess === true && state.backendSynced !== true) {
+    state.prelaunchAccess = false;
+    state.backendSynced = false;
+    if (window.MCMealSave) state = window.MCMealSave.save(state);
+  }
+
   const BACKEND = {
     baseUrl: "https://pgublsfhmtjcqcvvgfko.supabase.co/functions/v1",
     endpoints: {
@@ -404,7 +412,7 @@
   }
 
   function hasPrivateAccess() {
-    return Boolean(state.wallet && state.prelaunchAccess === true);
+    return Boolean(state.wallet && state.prelaunchAccess === true && state.backendSynced === true);
   }
 
   function publicAccessTierLabel(rawTier) {
@@ -1156,7 +1164,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-v10-onchain-burn" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-v10-2-sync-fix" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1168,7 +1176,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-onchain-burn`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-2-sync-fix`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -2010,6 +2018,8 @@
 
     if (hasPrivateAccess() && start) {
       start.classList.add("hidden");
+    } else if (start) {
+      start.classList.remove("hidden");
     }
   }
 

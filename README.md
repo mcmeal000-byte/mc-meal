@@ -89,3 +89,9 @@ Cleaned the Launch / Wallet page:
 - Access Tier no longer exposes backend/private-test wording.
 - Internal `Private Test Access` is displayed as `Kitchen Access`.
 - Launch modal wording changed to final wallet/access language.
+
+
+## v10.2 Sync Fix
+- Stale local wallet cache no longer opens Kitchen access.
+- Start screen remains until check-access + profile-connect successfully sync.
+- Prevents LOCAL VIEW gameplay from appearing as connected.
