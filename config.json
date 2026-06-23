@@ -1,10 +1,11 @@
 {
-  "SOLANA_RPC": "https://api.mainnet-beta.solana.com",
+  "SOLANA_RPC": "",
   "MEAL_MINT": "EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "BUY_MEAL_URL": "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "REWARD_VAULT_WALLET": "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV",
   "TREASURY_WALLET": "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR",
   "MIN_MEAL_BALANCE": 1,
   "NETWORK": "mainnet-beta",
-  "TOKEN_DECIMALS": 6
+  "TOKEN_DECIMALS": 6,
+  "NOTE": "v13 uses Supabase Edge Functions for onchain preparation and verification. Put your stable RPC in Supabase secret SOLANA_RPC_URL, not here."
 }

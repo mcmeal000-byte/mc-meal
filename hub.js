@@ -1,4 +1,4 @@
-// MC Meal Live v12 - RPC CORS fix + $MEAL holder/shop/craft fix
+// MC Meal Live v13 - server-prepared onchain payments + sell/craft hardening
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -161,7 +161,8 @@
       submitRun: "/submit-run",
       craft: "/craft",
       shopBuy: "/shop-buy-demo",
-      shopSell: "/shop-sell-demo"
+      shopSell: "/shop-sell-demo",
+      createPayment: "/create-onchain-payment"
     }
   };
 
@@ -177,7 +178,7 @@
   const MYSTERY_CRAFT_COST_MEAL = 500;
   const MYSTERY_CRAFT_BURN_MEAL = 450;
   const MYSTERY_CRAFT_POOL_MEAL = 50;
-  const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
+  const SOLANA_RPC_URL = ""; // v13: browser no longer calls public RPC for onchain payments. Server prepares tx.
   let activeGameRun = null;
 
   const SHOP_ITEM_IDS = {
@@ -194,6 +195,19 @@
 
   function shortWallet(address) {
     return address ? `${address.slice(0, 6)}...${address.slice(-6)}` : "Not connected";
+  }
+
+  function formatMealAmount(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return "0";
+    return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  }
+
+  function base64ToUint8Array(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
   }
 
   async function backendCall(endpoint, payload, timeoutMs = 12000) {
@@ -342,54 +356,56 @@
   async function payMealOnchain(actionType) {
     const web3 = requireSolanaWeb3();
     const provider = getPhantomProvider();
+
     if (!state.wallet) throw new Error("wallet_not_connected");
+
     if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
       await provider.connect({ onlyIfTrusted: false });
     }
 
-    const payer = new web3.PublicKey(state.wallet);
-    const mint = new web3.PublicKey(OFFICIAL_MEAL_MINT);
-    const rewardOwner = new web3.PublicKey(REWARD_VAULT_WALLET);
-    const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
+    const walletAddress = state.wallet;
 
-    const plan = actionType === "mystery_craft"
-      ? { burnMeal: MYSTERY_CRAFT_BURN_MEAL, rewardMeal: MYSTERY_CRAFT_POOL_MEAL, totalMeal: MYSTERY_CRAFT_COST_MEAL, label: "Mystery Craft" }
-      : { burnMeal: EXTRA_RUN_BURN_MEAL, rewardMeal: EXTRA_RUN_POOL_MEAL, totalMeal: EXTRA_REWARDED_RUN_COST, label: "Extra Reward Run" };
+    const payment = await backendCall(BACKEND.endpoints.createPayment, {
+      walletAddress,
+      actionType
+    }, 20000);
 
-    addLog(`${plan.label}: opening Phantom for ${plan.burnMeal} $MEAL burn + ${plan.rewardMeal} $MEAL Reward Vault.`);
-
-    const sourceTokenAccount = await findUserMealTokenAccount(connection, payer, mint);
-    const rewardAta = await getAssociatedTokenAddress(rewardOwner, mint);
-    const tx = new web3.Transaction();
-
-    const rewardAtaInfo = await connection.getAccountInfo(rewardAta, "confirmed");
-    if (!rewardAtaInfo) {
-      tx.add(createAssociatedTokenAccountInstruction(payer, rewardAta, rewardOwner, mint));
+    if (!payment?.transactionBase64) {
+      throw new Error("missing_prepared_transaction");
     }
 
-    tx.add(createBurnCheckedInstruction(sourceTokenAccount, mint, payer, plan.burnMeal));
-    tx.add(createTransferCheckedInstruction(sourceTokenAccount, mint, rewardAta, payer, plan.rewardMeal));
+    const plan = payment.plan || {};
+    const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : "Extra Reward Run");
 
-    const latest = await connection.getLatestBlockhash("confirmed");
-    tx.feePayer = payer;
-    tx.recentBlockhash = latest.blockhash;
+    addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
 
-    const response = await provider.signAndSendTransaction(tx);
-    const signature = typeof response === "string" ? response : response.signature;
+    const tx = web3.Transaction.from(base64ToUint8Array(payment.transactionBase64));
+
+    let response;
+    try {
+      response = await provider.signAndSendTransaction(tx);
+    } catch (err) {
+      const msg = err?.message || "wallet_signature_rejected";
+      throw new Error(msg);
+    }
+
+    const signature = typeof response === "string" ? response : response?.signature;
     if (!signature) throw new Error("missing_transaction_signature");
 
-    await connection.confirmTransaction({
-      signature,
-      blockhash: latest.blockhash,
-      lastValidBlockHeight: latest.lastValidBlockHeight
-    }, "confirmed");
+    console.log("MCMEAL ONCHAIN PAYMENT SIGNATURE:", { actionType, signature, payment });
 
-    addLog(`${plan.label}: onchain transaction confirmed.`);
+    addLog(`${label}: transaction sent. Backend will verify signature before rewards are delivered.`);
     return signature;
   }
 
   function syncBackendState(data) {
     if (!data) return;
+
+    if (data.balance !== undefined || data.mealBalance !== undefined || data.onchainMealBalance !== undefined) {
+      state.onchainMealBalance = Number(
+        data.onchainMealBalance ?? data.mealBalance ?? data.balance ?? state.onchainMealBalance ?? 0
+      );
+    }
 
     const profile = data.profile || null;
 
@@ -1486,10 +1502,16 @@
       const onchainText = result.onchainVerified ? ` · Onchain: ${result.burned || 0} burned + ${result.pool || 0} to Reward Vault` : "";
       addLog(`Crafted ${craftedName} → ${result.resultItem}. +${craftedXp} XP.${onchainText}`);
     } catch (err) {
-      const msg = err?.message || "craft_failed";
+      const msg = err?.data?.error || err?.message || "craft_failed";
+      console.log("MCMEAL CRAFT ERROR:", err?.data || err);
+
       if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
       else if (msg === "not_enough_meal") addLog("Craft failed: not enough $MEAL.");
       else if (msg === "mystery_craft_daily_limit_reached") addLog("Craft failed: daily Mystery Meal limit reached. Come back tomorrow.");
+      else if (msg === "onchain_payment_required") addLog("Craft failed: Mystery Craft needs a verified Phantom transaction.");
+      else if (msg === "invalid_onchain_payment") addLog("Craft failed: onchain payment could not be verified.");
+      else if (String(msg).includes("missing_prepared_transaction")) addLog("Craft failed: payment transaction could not be prepared.");
+      else if (String(msg).includes("403") || String(msg).includes("Forbidden")) addLog("Craft failed: Solana RPC blocked the request. Check Supabase SOLANA_RPC_URL secret.");
       else addLog(`Craft failed: ${msg}.`);
     }
 
@@ -1597,7 +1619,8 @@
         <div class="modal-panel">
           <h3>Shop Balance</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>$MEAL Balance</strong><span>$MEAL kitchen balance</span></div><strong>${state.meal}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Wallet $MEAL</strong><span>Real onchain holder balance</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Balance</strong><span>Backend game balance</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
@@ -1682,8 +1705,18 @@
           syncBackendState(result);
           addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
         } catch (err) {
-          const msg = err?.message || "shop_sell_failed";
-          addLog(msg === "missing_item" ? `Sell failed: missing ${item}.` : `Sell failed: ${msg}.`);
+          const msg = err?.data?.error || err?.message || "shop_sell_failed";
+          console.log("MCMEAL SHOP SELL ERROR:", err?.data || err);
+
+          addLog(
+            msg === "missing_item"
+              ? `Sell failed: missing ${item}.`
+              : msg === "not_meal_holder"
+                ? "Sell failed: wallet is not detected as $MEAL holder."
+                : msg === "unknown_sell_item"
+                  ? `Sell failed: unknown sell item ${item}.`
+                  : `Sell failed: ${msg}.`
+          );
         }
         renderShopModal("sell");
       });
@@ -1878,6 +1911,7 @@
       state.prelaunchAccess = true;
       state.backendSynced = true;
       state.accessTier = "Kitchen Access";
+      state.onchainMealBalance = balance;
 
       saveState();
 
@@ -1961,55 +1995,10 @@
   }
 
   async function fetchMealBalance(walletAddress) {
-    const cfg = await loadConfig();
-
-    const mealMint =
-      cfg && cfg.MEAL_MINT && !cfg.MEAL_MINT.includes("REPLACE")
-        ? cfg.MEAL_MINT
-        : OFFICIAL_MEAL_MINT;
-
-    // Browser-safe RPC fallback.
-    // publicnode blocks mcmeal.xyz with CORS, so never use it in the frontend.
-    const rpcUrl =
-      cfg && cfg.SOLANA_RPC && !String(cfg.SOLANA_RPC).includes("publicnode")
-        ? cfg.SOLANA_RPC
-        : "https://api.mainnet-beta.solana.com";
-
-    const body = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getTokenAccountsByOwner",
-      params: [
-        walletAddress,
-        { mint: mealMint },
-        { encoding: "jsonParsed" }
-      ]
-    };
-
-    const res = await fetch(rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-
-    const data = await res.json();
-    const accounts = data?.result?.value || [];
-
-    let total = 0;
-
-    for (const acc of accounts) {
-      const tokenAmount = acc?.account?.data?.parsed?.info?.tokenAmount;
-      const uiAmountString = tokenAmount?.uiAmountString;
-      const uiAmount = tokenAmount?.uiAmount;
-      const amount =
-        uiAmountString !== undefined
-          ? Number(uiAmountString)
-          : Number(uiAmount || 0);
-
-      if (Number.isFinite(amount)) total += amount;
-    }
-
-    return total;
+    // v13: do not query Solana public RPC directly from the browser.
+    // Holder balance is fetched through the server-side check-access function.
+    const data = await backendCall(BACKEND.endpoints.checkAccess, { walletAddress }, 15000);
+    return Number(data?.balance || data?.mealBalance || 0);
   }
 
   async function loadConfig() {
