@@ -184,13 +184,15 @@
   const SHOP_ITEM_IDS = {
     Bun: "bun_pack",
     Patty: "patty_pack",
+    Cheese: "cheese_pack",
+    Lettuce: "lettuce_pack",
     Fries: "fries_pack",
     Soda: "soda_pack",
     Sauce: "sauce_pack",
-    "Mystery Ticket": "mystery-ticket",
-    "Recipe Fragment": "recipe-fragment",
-    "Secret Receipt": "secret-receipt",
-    "Craft Entry": "craft-entry"
+    "Mystery Ticket": "mystery_ticket",
+    "Recipe Fragment": "recipe_fragment",
+    "Secret Receipt": "secret_receipt",
+    "Craft Entry": "craft_entry"
   };
 
   function shortWallet(address) {
@@ -1505,8 +1507,13 @@
       const msg = err?.data?.error || err?.message || "craft_failed";
       console.log("MCMEAL CRAFT ERROR:", err?.data || err);
 
-      if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
-      else if (msg === "not_enough_meal") addLog("Craft failed: not enough $MEAL.");
+      if (msg === "missing_ingredients") {
+        const missingText = Array.isArray(err?.data?.missing) && err.data.missing.length
+          ? err.data.missing.map(r => `${r.item} ${r.owned || 0}/${r.qty}`).join(", ")
+          : "ingredients";
+        addLog(`Craft failed: missing ${missingText}.`);
+      }
+      else if (msg === "not_enough_meal") addLog(`Craft failed: not enough $MEAL. Available ${err?.data?.currentMeal ?? 0}, needed ${err?.data?.costMeal ?? "?"}.`);
       else if (msg === "mystery_craft_daily_limit_reached") addLog("Craft failed: daily Mystery Meal limit reached. Come back tomorrow.");
       else if (msg === "onchain_payment_required") addLog("Craft failed: Mystery Craft needs a verified Phantom transaction.");
       else if (msg === "invalid_onchain_payment") addLog("Craft failed: onchain payment could not be verified.");
@@ -1540,10 +1547,12 @@
     const shop = [
       ["Bun Pack", "Bun", 3, 60, "Basic recipe base"],
       ["Patty Pack", "Patty", 3, 90, "Burger stack material"],
+      ["Cheese Pack", "Cheese", 3, 60, "Needed for Basic Burger + Mystery"],
+      ["Lettuce Pack", "Lettuce", 3, 45, "Needed for Basic Burger"],
       ["Fries Pack", "Fries", 3, 75, "Classic meal side"],
       ["Soda Pack", "Soda", 3, 75, "Classic meal drink"],
       ["Sauce Pack", "Sauce", 3, 120, "Important craft bottleneck"],
-      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key", false],
+      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key"],
       ["Recipe Fragment", "Recipe Fragment", 1, 1000, "Rare recipe progress", false],
       ["Secret Receipt", "Secret Receipt", 1, 3500, "Hidden Menu utility", true],
       ["Craft Entry", "Craft Entry", 1, 750, "Future premium action", false]
