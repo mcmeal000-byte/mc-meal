@@ -396,6 +396,10 @@
     return best;
   }
 
+  function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async function payMealOnchain(actionType) {
     const web3 = requireSolanaWeb3();
     const provider = getPhantomProvider();
@@ -437,7 +441,12 @@
 
     console.log("MCMEAL ONCHAIN PAYMENT SIGNATURE:", { actionType, signature, payment });
 
-    addLog(`${label}: transaction sent. Backend will verify signature before rewards are delivered.`);
+    addLog(`${label}: transaction sent. Waiting for Solana confirmation before final craft verification.`);
+
+    // Give Solana/Helius a short moment to index the just-submitted signature.
+    // The craft Edge Function also retries, this just reduces immediate race conditions.
+    await waitMs(4500);
+
     return signature;
   }
 
