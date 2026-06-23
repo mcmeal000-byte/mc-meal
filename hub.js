@@ -171,7 +171,7 @@
   const OFFICIAL_BUY_MEAL_URL = "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump";
   const REWARD_VAULT_WALLET = "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV";
   const TREASURY_WALLET = "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR";
-  const MIN_MEAL_BALANCE = 1;
+  const MIN_MEAL_BALANCE = 10000;
   const TOKEN_DECIMALS = 6;
   const EXTRA_RUN_BURN_MEAL = 200;
   const EXTRA_RUN_POOL_MEAL = 50;
@@ -203,6 +203,38 @@
     const n = Number(value || 0);
     if (!Number.isFinite(n)) return "0";
     return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  }
+
+
+  function getMealTier(balance) {
+    const amount = Number(balance || 0);
+
+    if (amount >= 250000) {
+      return { id: "legendary", name: "Legendary Kitchen", min: 250000, xpBonus: 0.20, sellBonus: 0.15, badge: "🔥 Legendary Chef", next: null };
+    }
+
+    if (amount >= 100000) {
+      return { id: "golden", name: "Golden Kitchen", min: 100000, xpBonus: 0.15, sellBonus: 0.10, badge: "🏆 Golden Chef", next: "Legendary Kitchen" };
+    }
+
+    if (amount >= 50000) {
+      return { id: "grill", name: "Grill Access", min: 50000, xpBonus: 0.10, sellBonus: 0.05, badge: "🔥 Grill Chef", next: "Golden Kitchen" };
+    }
+
+    if (amount >= 10000) {
+      return { id: "basic", name: "Basic Kitchen", min: 10000, xpBonus: 0.05, sellBonus: 0, badge: "🍔 Basic Chef", next: "Grill Access" };
+    }
+
+    return { id: "locked", name: "No Kitchen Access", min: 10000, xpBonus: 0, sellBonus: 0, badge: "Locked", next: "Basic Kitchen" };
+  }
+
+  function tierProgressText(balance) {
+    const amount = Number(balance || 0);
+    if (amount >= 250000) return "Max tier reached";
+    if (amount >= 100000) return `${formatMealAmount(250000 - amount)} $MEAL to Legendary Kitchen`;
+    if (amount >= 50000) return `${formatMealAmount(100000 - amount)} $MEAL to Golden Kitchen`;
+    if (amount >= 10000) return `${formatMealAmount(50000 - amount)} $MEAL to Grill Access`;
+    return `${formatMealAmount(Math.max(0, 10000 - amount))} $MEAL to Basic Kitchen`;
   }
 
   function base64ToUint8Array(base64) {
@@ -459,11 +491,20 @@
       );
     }
 
+    const receivedTier = data.tier || null;
+    if (receivedTier && receivedTier.name) {
+      state.mealTier = receivedTier;
+      state.accessTier = receivedTier.name;
+    } else if (state.onchainMealBalance !== undefined) {
+      state.mealTier = getMealTier(state.onchainMealBalance || 0);
+      if (state.mealTier.id !== "locked") state.accessTier = state.mealTier.name;
+    }
+
     const profile = data.profile || null;
 
     if (profile) {
       state.wallet = profile.wallet_address || state.wallet || null;
-      state.accessTier = profile.access_tier || state.accessTier || "Visitor";
+      state.accessTier = state.mealTier?.name || profile.access_tier || state.accessTier || "Visitor";
       state.xp = Number(profile.xp || 0);
       state.meal = Number(profile.meal_balance || 0);
       state.burned = Number(profile.meal_burned || 0);
@@ -522,7 +563,7 @@
   function publicAccessTierLabel(rawTier) {
     const tier = String(rawTier || "");
     if (!tier || tier === "Visitor" || tier.toLowerCase().includes("private") || tier.toLowerCase().includes("test")) {
-      return hasPrivateAccess() ? "Kitchen Access" : "Wallet Required";
+      return hasPrivateAccess() ? (state.mealTier?.name || "Basic Kitchen") : "Wallet Required";
     }
     return tier;
   }
@@ -538,12 +579,12 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN ACCESS LOCKED</div>
         <h3>Connect wallet to enter the Kitchen</h3>
-        <p>The Kitchen uses $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting. Minimum holder access: Hold at least 1 $MEAL.</p>
+        <p>The Kitchen uses live onchain $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting.</p>
         <div class="roadmap">
-          <div><strong>Access:</strong> Hold at least 1 $MEAL</div>
+          <div><strong>Basic Kitchen:</strong> Hold at least 10,000 $MEAL</div>
           <div class="official-link-box"><strong>Official $MEAL:</strong><br />EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>
-          <div><strong>Token:</strong> $MEAL economy</div>
-          <div><strong>Holder gate:</strong> minimum $MEAL balance</div>
+          <div><strong>Onchain:</strong> Mystery Craft burns 450 $MEAL and sends 50 $MEAL to the Reward Vault.</div>
+          <div><strong>Holder gate:</strong> 10,000 $MEAL minimum</div>
         </div>
         <br />
         <button class="action-btn" id="lockedConnectBtn">CONNECT WALLET</button>
@@ -568,6 +609,9 @@
     const defaults = {
       xp: 420,
       meal: 10000,
+      onchainMealBalance: 0,
+      accessTier: "Visitor",
+      mealTier: getMealTier(0),
       burned: 0,
       rewardPool: 0,
       bestScore: 0,
@@ -1937,6 +1981,9 @@
 
       console.log("MCMEAL CHECK ACCESS RESPONSE:", access);
 
+      const balance = Number(access.mealBalance ?? access.balance ?? 0);
+      const tier = access.tier && access.tier.name ? access.tier : getMealTier(balance);
+
       const accessGranted = Boolean(
         access.allowed === true ||
         access.access === true ||
@@ -1954,8 +2001,8 @@
             <div class="warning-box">
               <strong>Access locked.</strong><br />
               Wallet ${shortWallet(address)} is not detected as a $MEAL holder.<br />
-              Required: Hold at least 1 $MEAL.<br />
-              Detected balance: ${Number(access.balance || access.mealBalance || 0)} $MEAL<br /><br />
+              Required: Hold at least 10,000 $MEAL.<br />
+              Detected balance: ${formatMealAmount(balance)} $MEAL<br /><br />
               <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
             </div>
           `;
@@ -1964,12 +2011,11 @@
         return false;
       }
 
-      const balance = Number(access.mealBalance ?? access.balance ?? 0);
-
       state.wallet = address;
       state.prelaunchAccess = true;
       state.backendSynced = true;
-      state.accessTier = "Kitchen Access";
+      state.accessTier = tier.name;
+      state.mealTier = tier;
       state.onchainMealBalance = balance;
 
       saveState();
@@ -1997,7 +2043,8 @@
         state.wallet = address;
         state.prelaunchAccess = true;
         state.backendSynced = true;
-        state.accessTier = "Kitchen Access";
+        state.accessTier = tier.name;
+        state.mealTier = tier;
 
         saveState();
 
@@ -2008,9 +2055,9 @@
         resultEl.innerHTML = `
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
-            <div class="wallet-row"><span>Access</span><strong>Kitchen Access</strong></div>
-            <div class="wallet-row"><span>$MEAL Holder</span><strong>Detected</strong></div>
-            <div class="wallet-row"><span>$MEAL Balance</span><strong>${balance}</strong></div>
+            <div class="wallet-row"><span>Access Tier</span><strong>${tier.name}</strong></div>
+            <div class="wallet-row"><span>Badge</span><strong>${tier.badge}</strong></div>
+            <div class="wallet-row"><span>$MEAL Balance</span><strong>${formatMealAmount(balance)}</strong></div>
             <div class="wallet-row"><span>Backend</span><strong>${profile ? "Synced" : "Access granted, profile sync skipped"}</strong></div>
           </div>
         `;
@@ -2021,7 +2068,7 @@
         if (start) start.classList.add("hidden");
       }
 
-      addLog(`Wallet synced: ${shortWallet(address)} · $MEAL holder access granted.`);
+      addLog(`Wallet synced: ${shortWallet(address)} · ${tier.name} granted.`);
 
       return true;
     } catch (err) {
@@ -2036,7 +2083,7 @@
             <div class="warning-box">
               <strong>Access locked.</strong><br />
               This wallet does not have Kitchen access yet.<br />
-              Hold at least 1 $MEAL.<br /><br />
+              Hold at least 10,000 $MEAL.<br /><br />
               <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
             </div>
           `;
@@ -2075,7 +2122,9 @@
 
   function renderLaunchModal() {
     const walletText = state.wallet ? `${state.wallet.slice(0, 6)}...${state.wallet.slice(-6)}` : "Not connected";
-    const tier = state.accessTier || "Visitor";
+    const currentTier = state.mealTier || getMealTier(state.onchainMealBalance || 0);
+    const tier = state.accessTier || currentTier.name || "Visitor";
+    const currentBalance = formatMealAmount(state.onchainMealBalance || 0);
 
     setContent(`
       <div class="big-cta">
@@ -2087,11 +2136,14 @@
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
           <h3>Wallet Connect</h3>
-          <p>Connect Phantom to open the Kitchen. Holder access: <strong>Hold at least 1 $MEAL</strong>. Use the official $MEAL link below.</p>
+          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. Your tier is based on your live onchain $MEAL balance.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
             <div class="wallet-row"><span>Access Tier</span><strong>${tier}</strong></div>
+            <div class="wallet-row"><span>Badge</span><strong>${currentTier.badge || "Locked"}</strong></div>
+            <div class="wallet-row"><span>Wallet $MEAL</span><strong>${currentBalance}</strong></div>
+            <div class="wallet-row"><span>Next Step</span><strong>${tierProgressText(state.onchainMealBalance || 0)}</strong></div>
             <div class="wallet-row"><span>Backend Sync</span><strong>Active after connect</strong></div>
             <div class="wallet-row"><span>Official Mint</span><strong style="overflow-wrap:anywhere;">EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump</strong></div>
           </div>
@@ -2105,11 +2157,11 @@
         <div class="modal-panel">
           <h3>Kitchen Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Access</strong> Hold at least 1 $MEAL</div>
-            <div><strong>Basic Kitchen</strong> Hold $MEAL</div>
-            <div><strong>Grill Access</strong> 50,000 $MEAL</div>
-            <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
-            <div><strong>Legendary Kitchen</strong> 1,000,000 $MEAL</div>
+            <div><strong>Basic Kitchen</strong> 10,000 $MEAL · +5% XP · Kitchen access</div>
+            <div><strong>Grill Access</strong> 50,000 $MEAL · +10% XP · +5% sell bonus</div>
+            <div><strong>Golden Kitchen</strong> 100,000 $MEAL · +15% XP · +10% sell bonus</div>
+            <div><strong>Legendary Kitchen</strong> 250,000 $MEAL · +20% XP · +15% sell bonus</div>
+            <div><strong>Note</strong> Sell bonuses are internal Kitchen Balance bonuses, not direct wallet payouts.</div>
           </div>
         </div>
       </div>
@@ -2123,6 +2175,7 @@
             <div>Daily claim per wallet: live</div>
             <div>Run submit API with duplicate protection: live</div>
             <div>Craft + shop verification: live</div>
+            <div>Mystery Craft onchain: 450 $MEAL burn + 50 $MEAL Reward Vault</div>
           </div>
         </div>
 
@@ -2133,6 +2186,7 @@
             <div>4 real games: rewards connected</div>
             <div>Supabase save: active</div>
             <div>Wallet profile: active</div>
+            <div>Reward Vault: FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV</div>
           </div>
         </div>
       </div>

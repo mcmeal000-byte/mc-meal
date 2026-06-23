@@ -4,8 +4,8 @@
   "BUY_MEAL_URL": "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "REWARD_VAULT_WALLET": "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV",
   "TREASURY_WALLET": "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR",
-  "MIN_MEAL_BALANCE": 1,
+  "MIN_MEAL_BALANCE": 10000,
   "NETWORK": "mainnet-beta",
   "TOKEN_DECIMALS": 6,
-  "NOTE": "v13 uses Supabase Edge Functions for onchain preparation and verification. Put your stable RPC in Supabase secret SOLANA_RPC_URL, not here."
+  "NOTE": "v15 uses Supabase Edge Functions for onchain preparation/verification. Holder gate starts at 10,000 $MEAL. Put stable RPC in Supabase secret SOLANA_RPC_URL, not here."
 }
