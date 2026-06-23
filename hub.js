@@ -1,4 +1,4 @@
-// MC Meal Live v17 - onchain Load Credits + server-prepared payments
+// MC Meal Live v18 - profile usernames + leaderboard + payout foundation
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -164,7 +164,11 @@
       shopBuy: "/shop-buy-demo",
       shopSell: "/shop-sell-demo",
       createPayment: "/create-onchain-payment",
-      loadCredits: "/load-kitchen-credits"
+      loadCredits: "/load-kitchen-credits",
+      profileUpdate: "/profile-update",
+      leaderboardSubmit: "/leaderboard-submit",
+      leaderboardList: "/leaderboard-list",
+      payoutFoundation: "/payout-foundation"
     }
   };
 
@@ -185,8 +189,9 @@
   const LOAD_CREDITS_BURN_MEAL = 2000;
   const LOAD_CREDITS_REWARD_MEAL = 7000;
   const LOAD_CREDITS_TREASURY_MEAL = 1000;
-  const SOLANA_RPC_URL = ""; // v13: browser no longer calls public RPC for onchain payments. Server prepares tx.
+  const SOLANA_RPC_URL = ""; // Browser no longer calls public RPC for onchain payments. Server prepares tx.
   let activeGameRun = null;
+  let lastLeaderboardQuery = { period: "all_time", gameId: "all" };
 
   const SHOP_ITEM_IDS = {
     Bun: "bun_pack",
@@ -204,6 +209,22 @@
 
   function shortWallet(address) {
     return address ? `${address.slice(0, 6)}...${address.slice(-6)}` : "Not connected";
+  }
+
+  function chefName(walletAddress = state.wallet) {
+    return state.username || shortWallet(walletAddress);
+  }
+
+  function normalizeLocalUsername(value) {
+    return String(value || "").trim();
+  }
+
+  function usernameValidationMessage(username) {
+    if (!username) return "Username required.";
+    if (username.length < 3) return "Username must be at least 3 characters.";
+    if (username.length > 16) return "Username can be max 16 characters.";
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) return "Use only letters, numbers and underscore.";
+    return "";
   }
 
   function formatMealAmount(value) {
@@ -516,6 +537,8 @@
     if (profile) {
       state.wallet = profile.wallet_address || state.wallet || null;
       state.accessTier = state.mealTier?.name || profile.access_tier || state.accessTier || "Visitor";
+      state.username = profile.username || state.username || null;
+      state.usernameUpdatedAt = profile.username_updated_at || state.usernameUpdatedAt || null;
       state.xp = Number(profile.xp || 0);
       state.meal = Number(profile.meal_balance || 0);
       state.burned = Number(profile.meal_burned || 0);
@@ -550,6 +573,10 @@
         lastClaimDate: streak.last_claim_date || null,
         totalClaims: Number(streak.total_claims || 0)
       };
+    }
+
+    if (Array.isArray(data.leaderboard)) {
+      state.leaderboardRows = data.leaderboard;
     }
 
     if (
@@ -622,6 +649,10 @@
       meal: 10000,
       onchainMealBalance: 0,
       accessTier: "Visitor",
+      username: null,
+      usernameUpdatedAt: null,
+      leaderboardRows: [],
+      payoutMode: "dry_run",
       mealTier: getMealTier(0),
       burned: 0,
       rewardPool: 0,
@@ -686,6 +717,9 @@
 
   function resetWalletScopedLocalState(nextWallet) {
     state.wallet = nextWallet || state.wallet || null;
+    state.username = null;
+    state.usernameUpdatedAt = null;
+    state.leaderboardRows = [];
     state.inventory = {
       Bun: 0,
       Patty: 0,
@@ -1480,6 +1514,25 @@
       const runTypeText = result.runType === "paid" ? `Extra run onchain: ${result.burnedMeal || EXTRA_RUN_BURN_MEAL} burned + ${result.poolMeal || EXTRA_RUN_POOL_MEAL} to Reward Vault` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
 
+      try {
+        await backendCall(BACKEND.endpoints.leaderboardSubmit, {
+          walletAddress: state.wallet,
+          gameId: gameKey.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          gameName: gameKey,
+          score: result.score ?? score,
+          levelReached: Number(payload.level || payload.levelReached || 0),
+          durationSeconds: Math.floor(Number(payload.durationMs || 0) / 1000),
+          rewardedRun: true,
+          runType: result.runType || (runInfo.runMode === "paid" ? "paid" : "free"),
+          tierId: state.mealTier?.id || null,
+          tierName: state.mealTier?.name || null,
+          txSignature: runInfo.paymentSignature || null,
+          metadata: { source: "arcade_result", drops: savedDrops }
+        }, 12000);
+      } catch (leaderboardErr) {
+        console.log("MCMEAL LEADERBOARD SUBMIT ERROR:", leaderboardErr?.data || leaderboardErr);
+      }
+
       if (note) {
         note.innerHTML = `<strong>Backend saved:</strong> ${gameKey} · ${runTypeText} · Score ${result.score} · +${result.xpEarned} XP · ${result.drops.length ? result.drops.map(d => `${d.item} x${d.qty}`).join(", ") : "No item drops"}`;
       }
@@ -2017,29 +2070,121 @@
     `);
   }
 
-  function renderLeaderboardModal() {
+  function leaderboardRowHtml(row, index) {
+    const name = row.username || shortWallet(row.wallet_address || "");
+    const game = row.game_name || row.game_id || "Mini Game";
+    const date = row.created_at ? new Date(row.created_at).toLocaleDateString() : "";
+    return `
+      <div class="item-row">
+        <div class="pixel-icon">${index === 0 ? "🏆" : index === 1 ? "🥈" : index === 2 ? "🥉" : "⭐"}</div>
+        <div><strong>#${index + 1} ${name}</strong><span>${game} · ${date}</span></div>
+        <strong>${Number(row.score || 0).toLocaleString("en-US")}</strong>
+      </div>
+    `;
+  }
+
+  function renderLeaderboardModal(extraMessage = "") {
+    const rows = Array.isArray(state.leaderboardRows) ? state.leaderboardRows : [];
+    const username = state.username || "";
+    const shownName = username || shortWallet(state.wallet);
+
     setContent(`
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Live Kitchen Stats</h3>
+          <div class="season-badge">CHEF PROFILE</div>
+          <h3>👤 ${shownName}</h3>
+          <p>Your wallet stays the real identity. The username is your public kitchen name for leaderboards and future claims.</p>
+
           <div class="item-list">
+            <div class="item-row"><div class="pixel-icon">👤</div><div><strong>Username</strong><span>3-16 chars, letters/numbers/_</span></div><strong>${username || "Not set"}</strong></div>
+            <div class="item-row"><div class="pixel-icon">👛</div><div><strong>Wallet</strong><span>Connected identity</span></div><strong>${shortWallet(state.wallet)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Tier</strong><span>${state.mealTier?.badge || ""}</span></div><strong>${state.mealTier?.name || "Visitor"}</strong></div>
             <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${state.xp}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${state.bestScore}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>$MEAL Burned</strong><span>Onchain/game burn</span></div><strong>${state.burned}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Meals Crafted</strong><span>Total crafted meals</span></div><strong>${state.mealsCrafted}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${Number(state.bestScore || 0).toLocaleString("en-US")}</strong></div>
           </div>
+
+          <br />
+          <div class="item-row">
+            <div class="pixel-icon">✍️</div>
+            <div><strong>Set Username</strong><span>Unique. Changes are cooldown-protected.</span></div>
+            <input id="usernameInput" value="${username}" maxlength="16" placeholder="MCMEALCHEF" style="max-width:180px;" />
+          </div>
+          <br />
+          <button class="action-btn" id="saveUsernameBtn">SAVE USERNAME</button>
+          ${extraMessage ? `<div class="warning-box" style="margin-top:12px;">${extraMessage}</div>` : ""}
         </div>
+
         <div class="modal-panel">
-          <h3>Kitchen Leaderboards</h3>
+          <div class="season-badge">HOT / COLD WALLET PLAN</div>
+          <h3>🏦 Payout Foundation</h3>
           <div class="roadmap">
-            <div>Daily high score per mini-game: next leaderboard view</div>
-            <div>Most $MEAL burned: tracked</div>
-            <div>Most Mystery Meals crafted: tracked now</div>
-            <div>Golden Meal holders / crafters: tracked</div>
+            <div><strong>Reward Vault</strong> · cold pool proof, not backend signer.</div>
+            <div><strong>Treasury</strong> · operations / project revenue, not backend signer.</div>
+            <div><strong>Payout Hot Wallet</strong> · future small capped wallet for onchain claims.</div>
+            <div><strong>v18 Mode</strong> · payout tables + dry-run foundation only.</div>
           </div>
         </div>
       </div>
+
+      <div class="modal-panel">
+        <div class="season-badge">LEADERBOARD</div>
+        <h3>🏆 Kitchen Leaderboard</h3>
+        <p>Scores saved from rewarded arcade runs. Soft validation now; stricter signed run sessions later.</p>
+        <div class="item-row">
+          <div class="pixel-icon">📊</div>
+          <div><strong>View</strong><span>All games, all-time top scores</span></div>
+          <button class="small-btn" id="refreshLeaderboardBtn">REFRESH</button>
+        </div>
+        <div class="item-list" style="margin-top:12px;">
+          ${rows.length ? rows.map((row, i) => leaderboardRowHtml(row, i)).join("") : `<div class="item-row"><div></div><div><strong>No scores yet</strong><span>Play a rewarded arcade run to enter the board.</span></div><div></div></div>`}
+        </div>
+      </div>
     `);
+
+    const saveBtn = document.getElementById("saveUsernameBtn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", async () => {
+        if (!requireWallet("profile username")) return renderLeaderboardModal();
+        const input = document.getElementById("usernameInput");
+        const wanted = normalizeLocalUsername(input?.value || "");
+        const validation = usernameValidationMessage(wanted);
+        if (validation) return renderLeaderboardModal(validation);
+
+        try {
+          const result = await backendCall(BACKEND.endpoints.profileUpdate, {
+            walletAddress: state.wallet,
+            username: wanted
+          });
+          syncBackendState(result);
+          addLog(`Username saved: ${result.username}.`);
+          renderLeaderboardModal("Username saved.");
+        } catch (err) {
+          const msg = err?.data?.error || err?.message || "username_save_failed";
+          console.log("MCMEAL USERNAME ERROR:", err?.data || err);
+          renderLeaderboardModal(`Username save failed: ${msg}.`);
+        }
+      });
+    }
+
+    const refreshBtn = document.getElementById("refreshLeaderboardBtn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", async () => {
+        try {
+          const result = await backendCall(BACKEND.endpoints.leaderboardList, {
+            period: lastLeaderboardQuery.period,
+            gameId: lastLeaderboardQuery.gameId,
+            limit: 10
+          });
+          state.leaderboardRows = result.leaderboard || [];
+          saveState();
+          renderLeaderboardModal("Leaderboard refreshed.");
+        } catch (err) {
+          const msg = err?.data?.error || err?.message || "leaderboard_load_failed";
+          console.log("MCMEAL LEADERBOARD ERROR:", err?.data || err);
+          renderLeaderboardModal(`Leaderboard failed: ${msg}.`);
+        }
+      });
+    }
   }
 
 

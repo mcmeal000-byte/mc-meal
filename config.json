@@ -7,5 +7,5 @@
   "MIN_MEAL_BALANCE": 10000,
   "NETWORK": "mainnet-beta",
   "TOKEN_DECIMALS": 6,
-  "NOTE": "v17 uses onchain Load Credits: 10,000 $MEAL -> 10,000 Kitchen Credits, split 20% burn / 70% Reward Vault / 10% Treasury. Stable RPC belongs in Supabase secret SOLANA_RPC_URL."
+  "NOTE": "v18 adds username/profile, leaderboard foundation, and payout hot-wallet dry-run foundation. Onchain Load Credits and Mystery Craft remain unchanged. Stable RPC belongs in Supabase secret SOLANA_RPC_URL."
 }
