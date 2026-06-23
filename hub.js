@@ -196,22 +196,37 @@
     return address ? `${address.slice(0, 6)}...${address.slice(-6)}` : "Not connected";
   }
 
-  async function backendCall(endpoint, payload) {
-    const res = await fetch(`${BACKEND.baseUrl}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {})
-    });
-    let data = null;
-    try { data = await res.json(); } catch { data = { ok: false, error: await res.text() }; }
-    if (!res.ok || !data.ok) {
-      const error = data?.error || `backend_${res.status}`;
-      const e = new Error(error);
-      e.status = res.status;
-      e.data = data;
-      throw e;
+  async function backendCall(endpoint, payload, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(`${BACKEND.baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {}),
+        signal: controller.signal
+      });
+      let data = null;
+      try { data = await res.json(); } catch { data = { ok: false, error: await res.text() }; }
+      if (!res.ok || !data.ok) {
+        const error = data?.error || `backend_${res.status}`;
+        const e = new Error(`${endpoint}: ${error}`);
+        e.status = res.status;
+        e.data = data;
+        throw e;
+      }
+      return data;
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        const e = new Error(`${endpoint}: request_timeout`);
+        e.status = 408;
+        throw e;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
-    return data;
   }
 
 
@@ -1778,15 +1793,13 @@
         return false;
       }
 
-      let balance = null;
-      let balanceText = "Kitchen access granted. $MEAL holder access is active.";
-
-      try {
-        balance = await fetchMealBalance(address);
-        if (balance !== null) balanceText = `$MEAL balance found: ${balance}`;
-      } catch (e) {
-        balanceText = "Kitchen access granted. $MEAL economy is live.";
-      }
+      // v10.3: Do not call a public Solana RPC from the browser during connect.
+      // Holder balance is checked server-side by check-access. This prevents wallet connect from hanging
+      // when public RPC endpoints rate-limit/CORS-block browser requests.
+      let balance = Number(access.mealBalance || access.balance || MIN_MEAL_BALANCE);
+      let balanceText = access.mealBalance
+        ? `$MEAL balance found: ${access.mealBalance}`
+        : "Kitchen access granted. $MEAL holder access is active.";
 
       state.wallet = address;
       state.prelaunchAccess = true;
@@ -1794,7 +1807,7 @@
 
       const profile = await backendCall(BACKEND.endpoints.profileConnect, {
         walletAddress: address,
-        mealBalance: balance !== null ? balance : 10000
+        mealBalance: balance
       });
       syncBackendState(profile);
       state.prelaunchAccess = true;
