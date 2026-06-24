@@ -1,4 +1,4 @@
-// MC Meal Live v18.1 - leaderboard modes / overall + per-game
+// MC Meal Live v19.1 - payout polish / high-value queue / solscan logs
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -231,6 +231,21 @@
     const n = Number(value || 0);
     if (!Number.isFinite(n)) return "0";
     return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
+  }
+
+  function shortTx(signature) {
+    const sig = String(signature || "");
+    return sig ? `${sig.slice(0, 6)}...${sig.slice(-6)}` : "tx";
+  }
+
+  function solscanTxLink(signature) {
+    const sig = String(signature || "").trim();
+    if (!sig) return "";
+    return `<a href="https://solscan.io/tx/${sig}" target="_blank" rel="noopener noreferrer" style="color:#52f0cf;text-decoration:underline;">Solscan ${shortTx(sig)}</a>`;
+  }
+
+  function isHighValueSellItem(item) {
+    return item === "Legendary Meal" || item === "Golden Meal";
   }
 
 
@@ -1867,13 +1882,13 @@
       <div class="modal-panel">
         <div class="season-badge">SELL COUNTER</div>
         <h3>Sell Crafted Meals</h3>
-        <p>Sell crafted meals back to the Kitchen Buyer. Actions are saved on the backend.</p>
+        <p>Sell crafted meals back to the Kitchen Buyer. Auto payouts use the capped Payout Hot Wallet. Legendary and Golden claims are queued for manual review to protect the hot wallet.</p>
         <div class="action-list">
           ${sell.map(([item, price, note]) => `
             <div class="action-row">
               <div class="pixel-icon">${icon(item)}</div>
-              <div><strong>${item}</strong><span>Own x${state.inventory[item] || 0} · Sell ${price} $MEAL · ${note}</span></div>
-              <button class="small-btn gold" data-sell="${item}" data-price="${price}" ${(state.inventory[item] || 0) ? "" : "disabled"}>SELL</button>
+              <div><strong>${item}</strong><span>Own x${state.inventory[item] || 0} · Sell ${price} $MEAL · ${isHighValueSellItem(item) ? "High value claim / manual review" : note}</span></div>
+              <button class="small-btn gold" data-sell="${item}" data-price="${price}" ${(state.inventory[item] || 0) ? "" : "disabled"}>${isHighValueSellItem(item) ? "CLAIM" : "SELL"}</button>
             </div>
           `).join("")}
         </div>
@@ -1890,7 +1905,8 @@
           <div><strong>Split:</strong> 20% burn · 70% Reward Vault · 10% Treasury</div>
           <div><strong>Materials:</strong> bought quickly with Kitchen Credits, no Phantom popup per item</div>
           <div><strong>Mystery Craft:</strong> still uses a real 450 burn + 50 Reward Vault transaction</div>
-          <div><strong>Next:</strong> claim/sell crafted meals for onchain $MEAL from a capped payout wallet</div>
+          <div><strong>Sell Payout:</strong> crafted meals can pay real $MEAL from a capped Payout Hot Wallet when live mode is enabled</div>
+          <div><strong>High Value:</strong> Legendary and Golden sells are queued for manual review, not auto-paid</div>
         </div>
       </div>
     `;
@@ -2016,7 +2032,19 @@
             qty: 1
           });
           syncBackendState(result);
-          addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
+
+          if (result.payoutStatus === "paid_onchain") {
+            const sig = result.payoutTxSignature || result.txSignature;
+            addLog(`Sold ${result.qty}x ${result.itemName}. Paid ${result.mealAmount} $MEAL onchain from Payout Hot Wallet. ${solscanTxLink(sig)}`);
+          } else if (result.payoutStatus === "dry_run") {
+            addLog(`Sell dry-run logged for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Item was not removed because payout live mode is OFF.`);
+          } else if (result.payoutStatus === "queued_high_value") {
+            addLog(`High value claim queued for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Manual review required; item was not removed yet.`);
+          } else if (result.payoutStatus === "queued") {
+            addLog(`Sell payout queued for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Item was not removed until payout is processed.`);
+          } else {
+            addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
+          }
         } catch (err) {
           const msg = err?.data?.error || err?.message || "shop_sell_failed";
           console.log("MCMEAL SHOP SELL ERROR:", err?.data || err);
@@ -2565,7 +2593,7 @@
             <div><strong>Grill Access</strong> 50,000 $MEAL · +10% XP · +5% sell bonus</div>
             <div><strong>Golden Kitchen</strong> 100,000 $MEAL · +15% XP · +10% sell bonus</div>
             <div><strong>Legendary Kitchen</strong> 250,000 $MEAL · +20% XP · +15% sell bonus</div>
-            <div><strong>Note</strong> Sell bonuses are internal Kitchen Balance bonuses, not direct wallet payouts.</div>
+            <div><strong>Note</strong> Sell bonuses are added to eligible sell payouts. High value Legendary / Golden claims use manual review.</div>
           </div>
         </div>
       </div>
@@ -2579,6 +2607,7 @@
             <div>Daily claim per wallet: live</div>
             <div>Run submit API with duplicate protection: live</div>
             <div>Craft + shop verification: live</div>
+            <div>Sell payout hot wallet: live with caps</div>
             <div>Mystery Craft onchain: 450 $MEAL burn + 50 $MEAL Reward Vault</div>
           </div>
         </div>
