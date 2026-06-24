@@ -143,6 +143,8 @@
   ];
 
   let state = window.MCMealSave ? window.MCMealSave.load() : loadState();
+  let craftInProgress = false;
+  let onchainPaymentInProgress = false;
 
   // v10.2 safety: never trust a stale local wallet cache as live access.
   // The Kitchen opens only after check-access + profile-connect succeed in this session.
@@ -168,7 +170,8 @@
       profileUpdate: "/profile-update",
       leaderboardSubmit: "/leaderboard-submit",
       leaderboardList: "/leaderboard-list",
-      payoutFoundation: "/payout-foundation"
+      payoutFoundation: "/payout-foundation",
+      sendPayment: "/send-onchain-payment"
     }
   };
 
@@ -285,6 +288,27 @@
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
+  }
+
+  function uint8ArrayToBase64(bytes) {
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  }
+
+  function getWalletErrorMessage(err) {
+    const raw = err?.message || err?.error?.message || err?.reason || String(err || "wallet_error");
+    const code = err?.code ?? err?.error?.code;
+
+    if (code === 4001 || /reject|denied|cancel/i.test(raw)) return "wallet_signature_rejected";
+    if (/already|pending|in progress|request/i.test(raw) && /pending|in progress|request/i.test(raw)) return "phantom_request_already_pending";
+    if (/insufficient.*sol|not enough.*sol|0x1/i.test(raw)) return "not_enough_sol_for_network_fee";
+
+    return raw || "wallet_error";
   }
 
   async function backendCall(endpoint, payload, timeoutMs = 12000) {
@@ -476,57 +500,82 @@
   }
 
   async function payMealOnchain(actionType) {
-    const web3 = requireSolanaWeb3();
-    const provider = getPhantomProvider();
-
-    if (!state.wallet) throw new Error("wallet_not_connected");
-
-    if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
-      await provider.connect({ onlyIfTrusted: false });
+    if (onchainPaymentInProgress) {
+      throw new Error("phantom_request_already_pending");
     }
 
-    const walletAddress = state.wallet;
+    onchainPaymentInProgress = true;
 
-    const payment = await backendCallSimple(BACKEND.endpoints.createPayment, {
-      walletAddress,
-      actionType
-    }, 20000);
-
-    if (!payment?.transactionBase64) {
-      throw new Error("missing_prepared_transaction");
-    }
-
-    const plan = payment.plan || {};
-    const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : actionType === LOAD_CREDITS_ACTION ? "Load Kitchen Credits" : "Extra Reward Run");
-
-    if (actionType === LOAD_CREDITS_ACTION) {
-      addLog(`${label}: Phantom will open for ${plan.totalMeal || LOAD_CREDITS_AMOUNT} $MEAL. Split: ${plan.burnMeal || 0} burn · ${plan.rewardMeal || 0} Reward Vault · ${plan.treasuryMeal || 0} Treasury.`);
-    } else {
-      addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
-    }
-
-    const tx = web3.Transaction.from(base64ToUint8Array(payment.transactionBase64));
-
-    let response;
     try {
-      response = await provider.signAndSendTransaction(tx);
-    } catch (err) {
-      const msg = err?.message || "wallet_signature_rejected";
-      throw new Error(msg);
+      const web3 = requireSolanaWeb3();
+      const provider = getPhantomProvider();
+
+      if (!state.wallet) throw new Error("wallet_not_connected");
+
+      if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
+        await provider.connect({ onlyIfTrusted: false });
+      }
+
+      const walletAddress = state.wallet;
+
+      const payment = await backendCallSimple(BACKEND.endpoints.createPayment, {
+        walletAddress,
+        actionType
+      }, 20000);
+
+      if (!payment?.transactionBase64) {
+        throw new Error("missing_prepared_transaction");
+      }
+
+      const plan = payment.plan || {};
+      const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : actionType === LOAD_CREDITS_ACTION ? "Load Kitchen Credits" : "Extra Reward Run");
+
+      if (actionType === LOAD_CREDITS_ACTION) {
+        addLog(`${label}: Phantom will open for ${plan.totalMeal || LOAD_CREDITS_AMOUNT} $MEAL. Split: ${plan.burnMeal || 0} burn · ${plan.rewardMeal || 0} Reward Vault · ${plan.treasuryMeal || 0} Treasury.`);
+      } else {
+        addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
+      }
+
+      const tx = web3.Transaction.from(base64ToUint8Array(payment.transactionBase64));
+
+      let signature = null;
+
+      try {
+        if (typeof provider.signTransaction === "function") {
+          const signedTx = await provider.signTransaction(tx);
+          const signedTransactionBase64 = uint8ArrayToBase64(signedTx.serialize());
+
+          const sent = await backendCallSimple(BACKEND.endpoints.sendPayment, {
+            walletAddress,
+            actionType,
+            signedTransactionBase64,
+            blockhash: payment.blockhash,
+            lastValidBlockHeight: payment.lastValidBlockHeight
+          }, 35000);
+
+          signature = sent.signature;
+        } else {
+          const response = await provider.signAndSendTransaction(tx);
+          signature = typeof response === "string" ? response : response?.signature;
+        }
+      } catch (err) {
+        throw new Error(getWalletErrorMessage(err));
+      }
+
+      if (!signature) throw new Error("missing_transaction_signature");
+
+      console.log("MCMEAL ONCHAIN PAYMENT SIGNATURE:", { actionType, signature, payment });
+
+      addLog(`${label}: transaction sent. Waiting for Solana confirmation before final craft verification.`);
+
+      // Give Solana/Helius a short moment to index the just-submitted signature.
+      // The craft Edge Function also retries, this just reduces immediate race conditions.
+      await waitMs(4500);
+
+      return signature;
+    } finally {
+      onchainPaymentInProgress = false;
     }
-
-    const signature = typeof response === "string" ? response : response?.signature;
-    if (!signature) throw new Error("missing_transaction_signature");
-
-    console.log("MCMEAL ONCHAIN PAYMENT SIGNATURE:", { actionType, signature, payment });
-
-    addLog(`${label}: transaction sent. Waiting for Solana confirmation before final craft verification.`);
-
-    // Give Solana/Helius a short moment to index the just-submitted signature.
-    // The craft Edge Function also retries, this just reduces immediate race conditions.
-    await waitMs(4500);
-
-    return signature;
   }
 
   function syncBackendState(data) {
@@ -1754,6 +1803,13 @@
       return;
     }
 
+    if (craftInProgress) {
+      addLog("Craft already in progress. Please wait for Phantom / Solana confirmation.");
+      renderCraftModal();
+      return;
+    }
+
+    craftInProgress = true;
     let paymentSignature = null;
 
     try {
@@ -1792,10 +1848,15 @@
       else if (msg === "invalid_onchain_payment") addLog("Craft failed: onchain payment could not be verified.");
       else if (String(msg).includes("missing_prepared_transaction")) addLog("Craft failed: payment transaction could not be prepared.");
       else if (String(msg).includes("403") || String(msg).includes("Forbidden")) addLog("Craft failed: Solana RPC blocked the request. Check Supabase SOLANA_RPC_URL secret.");
+      else if (String(msg).includes("phantom_request_already_pending")) addLog("Craft failed: Phantom already has a pending request. Close Phantom, wait a few seconds, then click once.");
+      else if (String(msg).includes("wallet_signature_rejected")) addLog("Craft cancelled: Phantom signature was rejected.");
+      else if (String(msg).includes("not_enough_sol_for_network_fee")) addLog("Craft failed: wallet needs a little SOL for the Solana network fee.");
+      else if (String(msg).includes("Unexpected error")) addLog("Craft failed: Phantom returned an unexpected error. v19.2 sends signed transactions through server RPC; refresh and try once.");
       else addLog(`Craft failed: ${msg}.`);
+    } finally {
+      craftInProgress = false;
+      renderCraftModal();
     }
-
-    renderCraftModal();
   }
 
   function spendMeal(amount, burnRate) {

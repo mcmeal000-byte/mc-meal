@@ -7,5 +7,5 @@
   "MIN_MEAL_BALANCE": 10000,
   "NETWORK": "mainnet-beta",
   "TOKEN_DECIMALS": 6,
-  "NOTE": "v19.1 payout polish: hot wallet live payouts, Solscan log links, high-value Legendary/Golden claim queue, safer launch messaging. Stable RPC belongs in Supabase secret SOLANA_RPC_URL."
+  "NOTE": "v19.2: Phantom signs prepared onchain payments; Supabase send-onchain-payment broadcasts via server RPC. Fixes Phantom Unexpected error/double-click issues."
 }
