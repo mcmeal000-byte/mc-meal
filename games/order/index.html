@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>MC Meal – Mystery Order Rush · Level 10</title>
+  <title>MC Meal – Kitchen Rush</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,26 +12,31 @@
       <div class="topbar">
         <div>
           <h1>MC MEAL</h1>
-          <p>Mystery Order Rush · Level 10</p>
+          <p>Kitchen Rush – Customer Fix Clean Cookline Edition</p>
         </div>
         <div class="pill">Connected to Hub</div>
       </div>
 
-      <canvas id="game" width="800" height="660"></canvas>
+      <canvas id="game" width="960" height="720"></canvas>
 
-      <div class="mobile-controls">
+      <div class="mobile-controls" aria-label="Mobile controls">
         <div class="dpad">
-          <button data-key="ArrowLeft">◀</button>
-          <button data-key="ArrowRight">▶</button>
+          <button data-key="ArrowUp">▲</button>
+          <div>
+            <button data-key="ArrowLeft">◀</button>
+            <button data-key="ArrowDown">▼</button>
+            <button data-key="ArrowRight">▶</button>
+          </div>
         </div>
-        <button class="action" data-key="Space">PICK</button>
+        <button class="action" data-key="e">ACTION</button>
       </div>
 
       <div class="help">
-        <strong>Controls:</strong> Arrow keys / A-D move the hand. Space / PICK grabs the item under the hand. Build each order in the correct sequence.
+        <strong>Controls:</strong> WASD / Arrow Keys move. <strong>E</strong> / ACTION interacts.
+        Burger = Plate + ingredients. Salad = Plate + chopped Tomato + chopped Lettuce. Fries = Potato → Fryer.
       </div>
     </section>
   </main>
-  <script src="game.js?v=live-fix-v8-launch-clean"></script>
+  <script src="game.js"></script>
 </body>
 </html>

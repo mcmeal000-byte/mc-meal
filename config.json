@@ -1,11 +1,10 @@
 {
-  "SOLANA_RPC": "",
+  "SOLANA_RPC": "https://solana-rpc.publicnode.com",
   "MEAL_MINT": "EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "BUY_MEAL_URL": "https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump",
   "REWARD_VAULT_WALLET": "FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV",
   "TREASURY_WALLET": "DwPT7VNgG9uZEEK8xD4CMTQJv2BFpxhQPCQaGXooQ2jR",
   "MIN_MEAL_BALANCE": 10000,
   "NETWORK": "mainnet-beta",
-  "TOKEN_DECIMALS": 6,
-  "NOTE": "v19.2: Phantom signs prepared onchain payments; Supabase send-onchain-payment broadcasts via server RPC. Fixes Phantom Unexpected error/double-click issues."
+  "TOKEN_DECIMALS": 6
 }

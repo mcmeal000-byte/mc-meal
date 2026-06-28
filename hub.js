@@ -1,4 +1,4 @@
-// MC Meal Live v19.1 - payout polish / high-value queue / solscan logs
+// MC Meal Live v10.5 - Mystery Kitchen Rush replaces Mystery Craft
 (() => {
   const canvas = document.getElementById("hub");
   const ctx = canvas.getContext("2d");
@@ -143,11 +143,9 @@
   ];
 
   let state = window.MCMealSave ? window.MCMealSave.load() : loadState();
-  let craftInProgress = false;
-  let onchainPaymentInProgress = false;
 
   // v10.2 safety: never trust a stale local wallet cache as live access.
-  // The Kitchen opens only after check-access + profile-connect succeed in this session.
+  // The Kitchen opens only after check-access succeeds in this session. profile-connect is optional.
   if (state.wallet && state.prelaunchAccess === true && state.backendSynced !== true) {
     state.prelaunchAccess = false;
     state.backendSynced = false;
@@ -161,17 +159,9 @@
       profileConnect: "/profile-connect",
       dailyClaim: "/daily-claim",
       submitRun: "/submit-run",
-      kitchenState: "/kitchen-state",
       craft: "/craft",
       shopBuy: "/shop-buy-demo",
-      shopSell: "/shop-sell-demo",
-      createPayment: "/create-onchain-payment",
-      loadCredits: "/load-kitchen-credits",
-      profileUpdate: "/profile-update",
-      leaderboardSubmit: "/leaderboard-submit",
-      leaderboardList: "/leaderboard-list",
-      payoutFoundation: "/payout-foundation",
-      sendPayment: "/send-onchain-payment"
+      shopSell: "/shop-sell-demo"
     }
   };
 
@@ -187,128 +177,24 @@
   const MYSTERY_CRAFT_COST_MEAL = 500;
   const MYSTERY_CRAFT_BURN_MEAL = 450;
   const MYSTERY_CRAFT_POOL_MEAL = 50;
-  const LOAD_CREDITS_ACTION = "load_credits_10000";
-  const LOAD_CREDITS_AMOUNT = 10000;
-  const LOAD_CREDITS_BURN_MEAL = 2000;
-  const LOAD_CREDITS_REWARD_MEAL = 7000;
-  const LOAD_CREDITS_TREASURY_MEAL = 1000;
-  const SOLANA_RPC_URL = ""; // Browser no longer calls public RPC for onchain payments. Server prepares tx.
+  const SOLANA_RPC_URL = "https://solana-rpc.publicnode.com";
   let activeGameRun = null;
-  let lastLeaderboardQuery = { mode: "overall", period: "all_time", gameId: "all" };
+  let activeMysteryCraftRun = null;
 
   const SHOP_ITEM_IDS = {
-    Bun: "bun_pack",
-    Patty: "patty_pack",
-    Cheese: "cheese_pack",
-    Lettuce: "lettuce_pack",
-    Fries: "fries_pack",
-    Soda: "soda_pack",
-    Sauce: "sauce_pack",
-    "Mystery Ticket": "mystery_ticket",
-    "Recipe Fragment": "recipe_fragment",
-    "Secret Receipt": "secret_receipt",
-    "Craft Entry": "craft_entry"
+    Bun: "bun-pack",
+    Patty: "patty-pack",
+    Fries: "fries-pack",
+    Soda: "soda-pack",
+    Sauce: "sauce-pack",
+    "Mystery Ticket": "mystery-ticket",
+    "Recipe Fragment": "recipe-fragment",
+    "Secret Receipt": "secret-receipt",
+    "Craft Entry": "craft-entry"
   };
 
   function shortWallet(address) {
     return address ? `${address.slice(0, 6)}...${address.slice(-6)}` : "Not connected";
-  }
-
-  function chefName(walletAddress = state.wallet) {
-    return state.username || shortWallet(walletAddress);
-  }
-
-  function normalizeLocalUsername(value) {
-    return String(value || "").trim();
-  }
-
-  function usernameValidationMessage(username) {
-    if (!username) return "Username required.";
-    if (username.length < 3) return "Username must be at least 3 characters.";
-    if (username.length > 16) return "Username can be max 16 characters.";
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) return "Use only letters, numbers and underscore.";
-    return "";
-  }
-
-  function formatMealAmount(value) {
-    const n = Number(value || 0);
-    if (!Number.isFinite(n)) return "0";
-    return n.toLocaleString("en-US", { maximumFractionDigits: 6 });
-  }
-
-  function shortTx(signature) {
-    const sig = String(signature || "");
-    return sig ? `${sig.slice(0, 6)}...${sig.slice(-6)}` : "tx";
-  }
-
-  function solscanTxLink(signature) {
-    const sig = String(signature || "").trim();
-    if (!sig) return "";
-    return `<a href="https://solscan.io/tx/${sig}" target="_blank" rel="noopener noreferrer" style="color:#52f0cf;text-decoration:underline;">Solscan ${shortTx(sig)}</a>`;
-  }
-
-  function isHighValueSellItem(item) {
-    return item === "Legendary Meal" || item === "Golden Meal";
-  }
-
-
-  function getMealTier(balance) {
-    const amount = Number(balance || 0);
-
-    if (amount >= 250000) {
-      return { id: "legendary", name: "Legendary Kitchen", min: 250000, xpBonus: 0.20, sellBonus: 0.15, badge: "🔥 Legendary Chef", next: null };
-    }
-
-    if (amount >= 100000) {
-      return { id: "golden", name: "Golden Kitchen", min: 100000, xpBonus: 0.15, sellBonus: 0.10, badge: "🏆 Golden Chef", next: "Legendary Kitchen" };
-    }
-
-    if (amount >= 50000) {
-      return { id: "grill", name: "Grill Access", min: 50000, xpBonus: 0.10, sellBonus: 0.05, badge: "🔥 Grill Chef", next: "Golden Kitchen" };
-    }
-
-    if (amount >= 10000) {
-      return { id: "basic", name: "Basic Kitchen", min: 10000, xpBonus: 0.05, sellBonus: 0, badge: "🍔 Basic Chef", next: "Grill Access" };
-    }
-
-    return { id: "locked", name: "No Kitchen Access", min: 10000, xpBonus: 0, sellBonus: 0, badge: "Locked", next: "Basic Kitchen" };
-  }
-
-  function tierProgressText(balance) {
-    const amount = Number(balance || 0);
-    if (amount >= 250000) return "Max tier reached";
-    if (amount >= 100000) return `${formatMealAmount(250000 - amount)} $MEAL to Legendary Kitchen`;
-    if (amount >= 50000) return `${formatMealAmount(100000 - amount)} $MEAL to Golden Kitchen`;
-    if (amount >= 10000) return `${formatMealAmount(50000 - amount)} $MEAL to Grill Access`;
-    return `${formatMealAmount(Math.max(0, 10000 - amount))} $MEAL to Basic Kitchen`;
-  }
-
-  function base64ToUint8Array(base64) {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes;
-  }
-
-  function uint8ArrayToBase64(bytes) {
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    return btoa(binary);
-  }
-
-  function getWalletErrorMessage(err) {
-    const raw = err?.message || err?.error?.message || err?.reason || String(err || "wallet_error");
-    const code = err?.code ?? err?.error?.code;
-
-    if (code === 4001 || /reject|denied|cancel/i.test(raw)) return "wallet_signature_rejected";
-    if (/already|pending|in progress|request/i.test(raw) && /pending|in progress|request/i.test(raw)) return "phantom_request_already_pending";
-    if (/insufficient.*sol|not enough.*sol|0x1/i.test(raw)) return "not_enough_sol_for_network_fee";
-
-    return raw || "wallet_error";
   }
 
   async function backendCall(endpoint, payload, timeoutMs = 12000) {
@@ -331,47 +217,6 @@
         e.data = data;
         throw e;
       }
-      return data;
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        const e = new Error(`${endpoint}: request_timeout`);
-        e.status = 408;
-        throw e;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-
-  // v13.2: Used only for create-onchain-payment.
-  // Reason: some Supabase Edge Function gateways can still fail browser OPTIONS/preflight.
-  // A text/plain POST is CORS-safelisted and does not trigger preflight.
-  async function backendCallSimple(endpoint, payload, timeoutMs = 20000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const res = await fetch(`${BACKEND.baseUrl}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload || {}),
-        signal: controller.signal
-      });
-
-      const text = await res.text();
-      let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch { data = { ok: false, error: text || `backend_${res.status}` }; }
-
-      if (!res.ok || !data || !data.ok) {
-        const error = data?.error || `backend_${res.status}`;
-        const e = new Error(`${endpoint}: ${error}`);
-        e.status = res.status;
-        e.data = data;
-        throw e;
-      }
-
       return data;
     } catch (err) {
       if (err?.name === "AbortError") {
@@ -495,114 +340,61 @@
     return best;
   }
 
-  function waitMs(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   async function payMealOnchain(actionType) {
-    if (onchainPaymentInProgress) {
-      throw new Error("phantom_request_already_pending");
+    const web3 = requireSolanaWeb3();
+    const provider = getPhantomProvider();
+    if (!state.wallet) throw new Error("wallet_not_connected");
+    if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
+      await provider.connect({ onlyIfTrusted: false });
     }
 
-    onchainPaymentInProgress = true;
+    const payer = new web3.PublicKey(state.wallet);
+    const mint = new web3.PublicKey(OFFICIAL_MEAL_MINT);
+    const rewardOwner = new web3.PublicKey(REWARD_VAULT_WALLET);
+    const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
 
-    try {
-      const web3 = requireSolanaWeb3();
-      const provider = getPhantomProvider();
+    const plan = actionType === "mystery_craft"
+      ? { burnMeal: MYSTERY_CRAFT_BURN_MEAL, rewardMeal: MYSTERY_CRAFT_POOL_MEAL, totalMeal: MYSTERY_CRAFT_COST_MEAL, label: "Mystery Craft" }
+      : { burnMeal: EXTRA_RUN_BURN_MEAL, rewardMeal: EXTRA_RUN_POOL_MEAL, totalMeal: EXTRA_REWARDED_RUN_COST, label: "Extra Reward Run" };
 
-      if (!state.wallet) throw new Error("wallet_not_connected");
+    addLog(`${plan.label}: opening Phantom for ${plan.burnMeal} $MEAL burn + ${plan.rewardMeal} $MEAL Reward Vault.`);
 
-      if (!provider.publicKey || provider.publicKey.toBase58() !== state.wallet) {
-        await provider.connect({ onlyIfTrusted: false });
-      }
+    const sourceTokenAccount = await findUserMealTokenAccount(connection, payer, mint);
+    const rewardAta = await getAssociatedTokenAddress(rewardOwner, mint);
+    const tx = new web3.Transaction();
 
-      const walletAddress = state.wallet;
-
-      const payment = await backendCallSimple(BACKEND.endpoints.createPayment, {
-        walletAddress,
-        actionType
-      }, 20000);
-
-      if (!payment?.transactionBase64) {
-        throw new Error("missing_prepared_transaction");
-      }
-
-      const plan = payment.plan || {};
-      const label = plan.label || (actionType === "mystery_craft" ? "Mystery Craft" : actionType === LOAD_CREDITS_ACTION ? "Load Kitchen Credits" : "Extra Reward Run");
-
-      if (actionType === LOAD_CREDITS_ACTION) {
-        addLog(`${label}: Phantom will open for ${plan.totalMeal || LOAD_CREDITS_AMOUNT} $MEAL. Split: ${plan.burnMeal || 0} burn · ${plan.rewardMeal || 0} Reward Vault · ${plan.treasuryMeal || 0} Treasury.`);
-      } else {
-        addLog(`${label}: Phantom will open for ${plan.burnMeal || 0} $MEAL burn + ${plan.rewardMeal || 0} $MEAL Reward Vault.`);
-      }
-
-      const tx = web3.Transaction.from(base64ToUint8Array(payment.transactionBase64));
-
-      let signature = null;
-
-      try {
-        if (typeof provider.signTransaction === "function") {
-          const signedTx = await provider.signTransaction(tx);
-          const signedTransactionBase64 = uint8ArrayToBase64(signedTx.serialize());
-
-          const sent = await backendCallSimple(BACKEND.endpoints.sendPayment, {
-            walletAddress,
-            actionType,
-            signedTransactionBase64,
-            blockhash: payment.blockhash,
-            lastValidBlockHeight: payment.lastValidBlockHeight
-          }, 35000);
-
-          signature = sent.signature;
-        } else {
-          const response = await provider.signAndSendTransaction(tx);
-          signature = typeof response === "string" ? response : response?.signature;
-        }
-      } catch (err) {
-        throw new Error(getWalletErrorMessage(err));
-      }
-
-      if (!signature) throw new Error("missing_transaction_signature");
-
-      console.log("MCMEAL ONCHAIN PAYMENT SIGNATURE:", { actionType, signature, payment });
-
-      addLog(`${label}: transaction sent. Waiting for Solana confirmation before final craft verification.`);
-
-      // Give Solana/Helius a short moment to index the just-submitted signature.
-      // The craft Edge Function also retries, this just reduces immediate race conditions.
-      await waitMs(4500);
-
-      return signature;
-    } finally {
-      onchainPaymentInProgress = false;
+    const rewardAtaInfo = await connection.getAccountInfo(rewardAta, "confirmed");
+    if (!rewardAtaInfo) {
+      tx.add(createAssociatedTokenAccountInstruction(payer, rewardAta, rewardOwner, mint));
     }
+
+    tx.add(createBurnCheckedInstruction(sourceTokenAccount, mint, payer, plan.burnMeal));
+    tx.add(createTransferCheckedInstruction(sourceTokenAccount, mint, rewardAta, payer, plan.rewardMeal));
+
+    const latest = await connection.getLatestBlockhash("confirmed");
+    tx.feePayer = payer;
+    tx.recentBlockhash = latest.blockhash;
+
+    const response = await provider.signAndSendTransaction(tx);
+    const signature = typeof response === "string" ? response : response.signature;
+    if (!signature) throw new Error("missing_transaction_signature");
+
+    await connection.confirmTransaction({
+      signature,
+      blockhash: latest.blockhash,
+      lastValidBlockHeight: latest.lastValidBlockHeight
+    }, "confirmed");
+
+    addLog(`${plan.label}: onchain transaction confirmed.`);
+    return signature;
   }
 
   function syncBackendState(data) {
     if (!data) return;
-
-    if (data.balance !== undefined || data.mealBalance !== undefined || data.onchainMealBalance !== undefined) {
-      state.onchainMealBalance = Number(
-        data.onchainMealBalance ?? data.mealBalance ?? data.balance ?? state.onchainMealBalance ?? 0
-      );
-    }
-
-    const receivedTier = data.tier || null;
-    if (receivedTier && receivedTier.name) {
-      state.mealTier = receivedTier;
-      state.accessTier = receivedTier.name;
-    } else if (state.onchainMealBalance !== undefined) {
-      state.mealTier = getMealTier(state.onchainMealBalance || 0);
-      if (state.mealTier.id !== "locked") state.accessTier = state.mealTier.name;
-    }
-
     const profile = data.profile || null;
-
     if (profile) {
       state.wallet = profile.wallet_address || state.wallet || null;
-      state.accessTier = state.mealTier?.name || profile.access_tier || state.accessTier || "Visitor";
-      state.username = profile.username || state.username || null;
-      state.usernameUpdatedAt = profile.username_updated_at || state.usernameUpdatedAt || null;
+      state.accessTier = profile.access_tier || state.accessTier || "Visitor";
       state.xp = Number(profile.xp || 0);
       state.meal = Number(profile.meal_balance || 0);
       state.burned = Number(profile.meal_burned || 0);
@@ -615,22 +407,12 @@
 
     if (Array.isArray(data.inventory)) {
       const nextInventory = { ...(state.inventory || {}) };
-
-      for (const key of Object.keys(nextInventory)) {
-        nextInventory[key] = 0;
-      }
-
-      for (const row of data.inventory) {
-        const itemName = row.item_name || row.itemName || row.item || row.name;
-        if (!itemName) continue;
-        nextInventory[itemName] = Number(row.qty ?? row.quantity ?? row.amount ?? 0);
-      }
-
+      for (const key of Object.keys(nextInventory)) nextInventory[key] = 0;
+      for (const row of data.inventory) nextInventory[row.item_name] = Number(row.qty || 0);
       state.inventory = nextInventory;
     }
 
     const streak = data.dailyStreak || data.streak || null;
-
     if (streak) {
       state.streak = {
         current: Number(streak.current_streak || 0),
@@ -639,22 +421,9 @@
       };
     }
 
-    if (Array.isArray(data.leaderboard)) {
-      state.leaderboardRows = data.leaderboard;
-    }
-
-    if (
-      data.allowed === true ||
-      data.access === true ||
-      data.holder === true ||
-      data.mode === "prelaunch_private_test"
-    ) {
-      state.prelaunchAccess = true;
-    }
-
+    if (data.allowed === true || data.mode === "prelaunch_private_test") state.prelaunchAccess = true;
     state.backendSynced = true;
     state.lastSync = new Date().toISOString();
-
     saveState();
   }
 
@@ -665,7 +434,7 @@
   function publicAccessTierLabel(rawTier) {
     const tier = String(rawTier || "");
     if (!tier || tier === "Visitor" || tier.toLowerCase().includes("private") || tier.toLowerCase().includes("test")) {
-      return hasPrivateAccess() ? (state.mealTier?.name || "Basic Kitchen") : "Wallet Required";
+      return hasPrivateAccess() ? "Kitchen Access" : "Wallet Required";
     }
     return tier;
   }
@@ -681,12 +450,12 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN ACCESS LOCKED</div>
         <h3>Connect wallet to enter the Kitchen</h3>
-        <p>The Kitchen uses live onchain $MEAL holder access. Connect Phantom to sync your profile, runs, rewards and crafting.</p>
+        <p>The Kitchen uses $MEAL holder access. Connect Phantom to verify access, runs, rewards and crafting. Minimum holder access: 10,000 $MEAL.</p>
         <div class="roadmap">
-          <div><strong>Basic Kitchen:</strong> Hold at least 10,000 $MEAL</div>
+          <div><strong>Access:</strong> 10,000 $MEAL required</div>
           <div class="official-link-box"><strong>Official $MEAL:</strong><br />EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>
-          <div><strong>Onchain:</strong> Mystery Craft burns 450 $MEAL and sends 50 $MEAL to the Reward Vault.</div>
-          <div><strong>Holder gate:</strong> 10,000 $MEAL minimum</div>
+          <div><strong>Token:</strong> $MEAL economy</div>
+          <div><strong>Holder gate:</strong> minimum $MEAL balance</div>
         </div>
         <br />
         <button class="action-btn" id="lockedConnectBtn">CONNECT WALLET</button>
@@ -711,33 +480,22 @@
     const defaults = {
       xp: 420,
       meal: 10000,
-      onchainMealBalance: 0,
-      accessTier: "Visitor",
-      username: null,
-      usernameUpdatedAt: null,
-      leaderboardRows: [],
-      payoutMode: "dry_run",
-      mealTier: getMealTier(0),
       burned: 0,
       rewardPool: 0,
       bestScore: 0,
       mealsCrafted: 0,
       miniRuns: 0,
       inventory: {
-        Bun: 0,
-        Patty: 0,
-        Cheese: 0,
-        Lettuce: 0,
-        Fries: 0,
-        Soda: 0,
-        Sauce: 0,
-        "Mystery Ticket": 0,
-        "Recipe Fragment": 0,
-        "Craft Entry": 0,
-        "Basic Burger": 0,
-        "Classic MC Meal": 0,
-        "Kitchen Scrap": 0,
-        "Common Meal": 0,
+        Bun: 6,
+        Patty: 5,
+        Cheese: 4,
+        Lettuce: 4,
+        Fries: 5,
+        Soda: 5,
+        Sauce: 4,
+        "Mystery Ticket": 2,
+        "Recipe Fragment": 1,
+        "Common Meal": 1,
         "Rare Meal": 0,
         "Supreme Meal": 0,
         "Legendary Meal": 0,
@@ -777,59 +535,6 @@
       if (state.log.length > 8) state.log = state.log.slice(-8);
     }
     saveState();
-  }
-
-  function resetWalletScopedLocalState(nextWallet) {
-    state.wallet = nextWallet || state.wallet || null;
-    state.username = null;
-    state.usernameUpdatedAt = null;
-    state.leaderboardRows = [];
-    state.inventory = {
-      Bun: 0,
-      Patty: 0,
-      Cheese: 0,
-      Lettuce: 0,
-      Fries: 0,
-      Soda: 0,
-      Sauce: 0,
-      "Mystery Ticket": 0,
-      "Recipe Fragment": 0,
-      "Craft Entry": 0,
-      "Basic Burger": 0,
-      "Classic MC Meal": 0,
-      "Kitchen Scrap": 0,
-      "Common Meal": 0,
-      "Rare Meal": 0,
-      "Supreme Meal": 0,
-      "Legendary Meal": 0,
-      "Golden Meal": 0
-    };
-    state.streak = null;
-    state.rewardedRuns = { day: null, freeUsed: {} };
-    state.xp = 0;
-    state.meal = 0;
-    state.bestScore = 0;
-    state.miniRuns = 0;
-    state.mealsCrafted = 0;
-    saveState();
-  }
-
-  async function syncKitchenState(reason = "manual") {
-    if (!state.wallet || !state.backendSynced) return null;
-
-    try {
-      const result = await backendCall(BACKEND.endpoints.kitchenState, {
-        walletAddress: state.wallet,
-        reason
-      });
-
-      syncBackendState(result);
-      saveState();
-      return result;
-    } catch (err) {
-      console.log("MCMEAL KITCHEN STATE SYNC ERROR:", err?.data || err);
-      return null;
-    }
   }
 
   function todayKey() {
@@ -1337,14 +1042,7 @@
     if (id === "arcade") renderArcadeModal();
     else if (id === "craft") renderCraftModal();
     else if (id === "shop") renderShopModal();
-    else if (id === "fridge") {
-      renderInventoryModal();
-      syncKitchenState("fridge_open").then(() => {
-        if (modalOpen && document.getElementById("modalTitle")?.textContent === "FRIDGE") {
-          renderInventoryModal();
-        }
-      });
-    }
+    else if (id === "fridge") renderInventoryModal();
     else if (id === "leaderboard") renderLeaderboardModal();
     else if (id === "daily") renderDailyModal();
     else if (id === "launch") renderLaunchModal();
@@ -1384,8 +1082,8 @@
       },
       {
         icon: "🧾",
-        name: "Mystery Order Rush",
-        subtitle: "10-level ticket chaos run",
+        name: "Kitchen Rush",
+        subtitle: "Clean cookline customer challenge",
         src: "games/order/index.html"
       }
     ];
@@ -1443,28 +1141,6 @@
       return;
     }
 
-    if (runMode === "free") {
-      const preflightId = `free-preflight-${gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
-      try {
-        await backendCall(BACKEND.endpoints.submitRun, {
-          walletAddress: state.wallet,
-          gameKey: gameName,
-          clientRunId: preflightId,
-          runMode: "free",
-          preflight: true
-        });
-      } catch (err) {
-        const msg = err?.data?.error || err?.message || "free_run_preflight_failed";
-        if (msg === "free_run_already_used") {
-          markFreeRunUsed(gameName);
-          addLog(`${gameName}: daily free rewarded run already used today.`);
-          renderArcadeModal(`The free rewarded run for <strong>${gameName}</strong> was already used today. Start the <strong>Extra Reward Run</strong> for ${EXTRA_REWARDED_RUN_COST} $MEAL to keep earning rewards.`);
-          return;
-        }
-        console.log("MCMEAL FREE RUN PREFLIGHT SKIPPED:", err?.data || err);
-      }
-    }
-
     let paymentSignature = null;
     if (runMode === "paid") {
       const preflightId = `preflight-${gameName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
@@ -1504,7 +1180,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-v10-2-sync-fix" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-v10-5-mystery-rush" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1516,12 +1192,17 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-2-sync-fix`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-5-mystery-rush`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
   async function applyRealGameReward(payload) {
     if (!payload || payload.type !== "MCMEAL_GAME_RESULT") return;
+
+    if (activeMysteryCraftRun) {
+      await completeMysteryCraftRush(payload);
+      return;
+    }
 
     const note = document.getElementById("realGameRewardNote");
     const runInfo = activeGameRun || { runMode: "free", gameName: payload.game || "Mini Game" };
@@ -1557,45 +1238,9 @@
       });
 
       syncBackendState(result);
-
-      const savedDrops = Array.isArray(result.drops) && result.drops.length ? result.drops : dropObjects;
-
-      // v17.1: Always mirror the accepted drops locally after a successful backend save.
-      // If the backend response also contains a full inventory snapshot, the next kitchen-state sync below
-      // will keep the server as source of truth. This makes the Fridge update immediately after arcade rewards.
-      for (const drop of savedDrops) {
-        const dropItem = drop?.item;
-        const dropQty = Number(drop?.qty || 1);
-        if (dropItem && Number.isFinite(dropQty) && dropQty > 0) {
-          give(dropItem, dropQty);
-        }
-      }
-      saveState();
-
       if (result.runType !== "paid") markFreeRunUsed(gameKey);
-
-      await syncKitchenState("arcade_reward_saved");
       const runTypeText = result.runType === "paid" ? `Extra run onchain: ${result.burnedMeal || EXTRA_RUN_BURN_MEAL} burned + ${result.poolMeal || EXTRA_RUN_POOL_MEAL} to Reward Vault` : "Daily free run used";
       addLog(`${gameKey}: ${runTypeText}. Backend saved score ${result.score}, +${result.xpEarned} XP.`);
-
-      try {
-        await backendCall(BACKEND.endpoints.leaderboardSubmit, {
-          walletAddress: state.wallet,
-          gameId: gameKey.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          gameName: gameKey,
-          score: result.score ?? score,
-          levelReached: Number(payload.level || payload.levelReached || 0),
-          durationSeconds: Math.floor(Number(payload.durationMs || 0) / 1000),
-          rewardedRun: true,
-          runType: result.runType || (runInfo.runMode === "paid" ? "paid" : "free"),
-          tierId: state.mealTier?.id || null,
-          tierName: state.mealTier?.name || null,
-          txSignature: runInfo.paymentSignature || null,
-          metadata: { source: "arcade_result", drops: savedDrops }
-        }, 12000);
-      } catch (leaderboardErr) {
-        console.log("MCMEAL LEADERBOARD SUBMIT ERROR:", leaderboardErr?.data || leaderboardErr);
-      }
 
       if (note) {
         note.innerHTML = `<strong>Backend saved:</strong> ${gameKey} · ${runTypeText} · Score ${result.score} · +${result.xpEarned} XP · ${result.drops.length ? result.drops.map(d => `${d.item} x${d.qty}`).join(", ") : "No item drops"}`;
@@ -1648,9 +1293,9 @@
       mystery: {
         id: "mystery",
         icon: "🎁",
-        name: "Mystery Meal Attempt",
+        name: "Mystery Kitchen Rush",
         resultItem: "Mystery Meal",
-        description: "Onchain cost: 450 $MEAL burned + 50 $MEAL to Reward Vault. Max 3 Mystery Meal attempts per wallet/day. Odds: Scrap 40%, Common 35%, Rare 18%, Supreme 5.5%, Legendary 1.25%, Golden 0.25%.",
+        description: "Play Kitchen Rush to unlock a Mystery Meal attempt. Final reveal uses the same Mystery Craft pricing: 500 $MEAL total — 450 $MEAL burned + 50 $MEAL to Reward Vault. Max 3 attempts per wallet/day.",
         costMeal: 500,
         burnRate: 0.9,
         requirements: [["Bun",1],["Patty",1],["Cheese",1],["Fries",1],["Soda",1],["Sauce",1],["Mystery Ticket",1]]
@@ -1731,7 +1376,7 @@
     const availableNow = [
       basicStatus.canCraft ? "Basic Burger" : null,
       classicStatus.canCraft ? "Classic MC Meal" : null,
-      mysteryStatus.canCraft ? "Mystery Meal Attempt" : null
+      mysteryStatus.canCraft ? "Mystery Kitchen Rush" : null
     ].filter(Boolean);
 
     setContent(`
@@ -1757,10 +1402,10 @@
         <div class="modal-panel">
           <h3>${recipes.mystery.icon} ${recipes.mystery.name}</h3>
           <p>${recipes.mystery.description}</p>
-          <div style="color:#b9a88a; margin-top:6px; margin-bottom:4px;">Odds: Scrap 40% · Common 35% · Rare 18% · Supreme 5.5% · Legendary 1.25% · Golden 0.25%</div>
+          <div style="color:#b9a88a; margin-top:6px; margin-bottom:4px;">Odds after completed run: Scrap 40% · Common 35% · Rare 18% · Supreme 5.5% · Legendary 1.25% · Golden 0.25%</div>
           ${recipeStatusLabel(mysteryStatus)}
           ${renderRecipeRequirements(mysteryStatus, recipes.mystery.costMeal)}
-          <button class="action-btn" data-craft="mystery" ${mysteryStatus.canCraft ? "" : "disabled"}>CRAFT MYSTERY</button>
+          <button class="action-btn" data-craft="mystery" ${mysteryStatus.canCraft ? "" : "disabled"}>PLAY MYSTERY RUSH — 500 $MEAL</button>
         </div>
 
         <div class="modal-panel">
@@ -1797,29 +1442,122 @@
     state.inventory[item] = (state.inventory[item] || 0) + qty;
   }
 
+  async function openMysteryCraftRush() {
+    if (!requireWallet("Mystery Kitchen Rush")) {
+      renderCraftModal();
+      return;
+    }
+
+    try {
+      await backendCall(BACKEND.endpoints.craft, {
+        walletAddress: state.wallet,
+        recipeId: "mystery",
+        preflight: true
+      });
+    } catch (err) {
+      const msg = err?.message || "mystery_preflight_failed";
+      if (msg.includes("missing_ingredients")) addLog("Mystery Rush blocked: missing ingredients or Mystery Ticket.");
+      else if (msg.includes("not_enough_meal")) addLog("Mystery Rush blocked: not enough $MEAL.");
+      else if (msg.includes("mystery_craft_daily_limit_reached")) addLog("Mystery Rush blocked: daily Mystery limit reached.");
+      else addLog(`Mystery Rush blocked: ${msg}.`);
+      renderCraftModal();
+      return;
+    }
+
+    activeGameRun = null;
+    activeMysteryCraftRun = {
+      recipeId: "mystery",
+      startedAt: Date.now(),
+      gameName: "Mystery Kitchen Rush"
+    };
+
+    setModalHeader("Mystery Kitchen Rush", "500 $MEAL · 450 burn + 50 Reward Vault");
+    setContent(`
+      <div class="real-game-wrap">
+        <div class="game-launch-note" id="realGameRewardNote">
+          <strong>Mystery Kitchen Rush active.</strong> Finish the kitchen run, then confirm the Mystery reveal transaction: <strong>${MYSTERY_CRAFT_BURN_MEAL} $MEAL burn + ${MYSTERY_CRAFT_POOL_MEAL} $MEAL Reward Vault</strong>. Max 3 attempts per wallet/day.
+        </div>
+
+        <iframe class="real-game-frame" src="games/order/index.html?v=live-v10-5-mystery-rush" title="Mystery Kitchen Rush" scrolling="no"></iframe>
+        <div class="mobile-note"></div>
+
+        <div class="game-actions">
+          <button class="small-btn gold" id="backToCraftFromMystery">BACK TO CRAFT HOUSE</button>
+          <button class="small-btn" id="openMysteryGameNewTab">OPEN FULL SCREEN</button>
+          <button class="small-btn red" id="closeMysteryGame">CLOSE</button>
+        </div>
+      </div>
+    `);
+
+    document.getElementById("backToCraftFromMystery").addEventListener("click", () => {
+      activeMysteryCraftRun = null;
+      renderCraftModal();
+    });
+    document.getElementById("openMysteryGameNewTab").addEventListener("click", () => window.open("games/order/index.html?v=live-v10-5-mystery-rush", "_blank"));
+    document.getElementById("closeMysteryGame").addEventListener("click", () => {
+      activeMysteryCraftRun = null;
+      closeModal();
+    });
+  }
+
+  async function completeMysteryCraftRush(payload) {
+    const note = document.getElementById("realGameRewardNote");
+
+    if (!activeMysteryCraftRun) return;
+    if (!requireWallet("Mystery Kitchen Rush reward")) {
+      if (note) note.innerHTML = `<strong>Wallet required:</strong> Connect Phantom, then run Mystery Kitchen Rush again.`;
+      return;
+    }
+
+    const score = Number(payload.score || 0);
+    const won = !!payload.won;
+
+    try {
+      if (note) {
+        note.innerHTML = `<strong>Kitchen Rush complete.</strong> Score ${score}. Opening Phantom for Mystery reveal: ${MYSTERY_CRAFT_BURN_MEAL} $MEAL burn + ${MYSTERY_CRAFT_POOL_MEAL} $MEAL Reward Vault.`;
+      }
+
+      const paymentSignature = await payMealOnchain("mystery_craft");
+
+      const result = await backendCall(BACKEND.endpoints.craft, {
+        walletAddress: state.wallet,
+        recipeId: "mystery",
+        paymentSignature,
+        gameScore: score,
+        gameWon: won,
+        gameName: payload.game || "Mystery Kitchen Rush"
+      });
+
+      syncBackendState(result);
+      activeMysteryCraftRun = null;
+
+      const craftedName = result.recipeName || "Mystery Kitchen Rush";
+      const craftedXp = result.xpEarned ?? result.xp ?? 0;
+      const onchainText = result.onchainVerified ? ` · Onchain: ${result.burned || MYSTERY_CRAFT_BURN_MEAL} burned + ${result.pool || MYSTERY_CRAFT_POOL_MEAL} to Reward Vault` : "";
+      addLog(`Mystery Rush completed. ${craftedName} → ${result.resultItem}. +${craftedXp} XP.${onchainText}`);
+
+      if (note) {
+        note.innerHTML = `<strong>Mystery reveal saved:</strong> ${result.resultItem}. +${craftedXp} XP.${onchainText}`;
+      }
+    } catch (err) {
+      const msg = err?.message || "mystery_rush_failed";
+      addLog(`Mystery Rush failed: ${msg}.`);
+      if (note) note.innerHTML = `<strong>Mystery Rush failed:</strong> ${msg}. No Mystery Meal was created.`;
+    }
+  }
+
   async function craft(type) {
     if (!requireWallet("crafting")) {
       renderCraftModal();
       return;
     }
 
-    if (craftInProgress) {
-      addLog("Craft already in progress. Please wait for Phantom / Solana confirmation.");
-      renderCraftModal();
-      return;
-    }
-
-    craftInProgress = true;
     let paymentSignature = null;
 
     try {
       if (type === "mystery") {
-        await backendCall(BACKEND.endpoints.craft, {
-          walletAddress: state.wallet,
-          recipeId: type,
-          preflight: true
-        });
-        paymentSignature = await payMealOnchain("mystery_craft");
+        await openMysteryCraftRush();
+        return;
       }
 
       const result = await backendCall(BACKEND.endpoints.craft, {
@@ -1833,30 +1571,14 @@
       const onchainText = result.onchainVerified ? ` · Onchain: ${result.burned || 0} burned + ${result.pool || 0} to Reward Vault` : "";
       addLog(`Crafted ${craftedName} → ${result.resultItem}. +${craftedXp} XP.${onchainText}`);
     } catch (err) {
-      const msg = err?.data?.error || err?.message || "craft_failed";
-      console.log("MCMEAL CRAFT ERROR:", err?.data || err);
-
-      if (msg === "missing_ingredients") {
-        const missingText = Array.isArray(err?.data?.missing) && err.data.missing.length
-          ? err.data.missing.map(r => `${r.item} ${r.owned || 0}/${r.qty}`).join(", ")
-          : "ingredients";
-        addLog(`Craft failed: missing ${missingText}.`);
-      }
-      else if (msg === "not_enough_meal") addLog(`Craft failed: not enough $MEAL. Available ${err?.data?.currentMeal ?? 0}, needed ${err?.data?.costMeal ?? "?"}.`);
+      const msg = err?.message || "craft_failed";
+      if (msg === "missing_ingredients") addLog("Craft failed: missing ingredients.");
+      else if (msg === "not_enough_meal") addLog("Craft failed: not enough $MEAL.");
       else if (msg === "mystery_craft_daily_limit_reached") addLog("Craft failed: daily Mystery Meal limit reached. Come back tomorrow.");
-      else if (msg === "onchain_payment_required") addLog("Craft failed: Mystery Craft needs a verified Phantom transaction.");
-      else if (msg === "invalid_onchain_payment") addLog("Craft failed: onchain payment could not be verified.");
-      else if (String(msg).includes("missing_prepared_transaction")) addLog("Craft failed: payment transaction could not be prepared.");
-      else if (String(msg).includes("403") || String(msg).includes("Forbidden")) addLog("Craft failed: Solana RPC blocked the request. Check Supabase SOLANA_RPC_URL secret.");
-      else if (String(msg).includes("phantom_request_already_pending")) addLog("Craft failed: Phantom already has a pending request. Close Phantom, wait a few seconds, then click once.");
-      else if (String(msg).includes("wallet_signature_rejected")) addLog("Craft cancelled: Phantom signature was rejected.");
-      else if (String(msg).includes("not_enough_sol_for_network_fee")) addLog("Craft failed: wallet needs a little SOL for the Solana network fee.");
-      else if (String(msg).includes("Unexpected error")) addLog("Craft failed: Phantom returned an unexpected error. v19.2 sends signed transactions through server RPC; refresh and try once.");
       else addLog(`Craft failed: ${msg}.`);
-    } finally {
-      craftInProgress = false;
-      renderCraftModal();
     }
+
+    renderCraftModal();
   }
 
   function spendMeal(amount, burnRate) {
@@ -1881,12 +1603,10 @@
     const shop = [
       ["Bun Pack", "Bun", 3, 60, "Basic recipe base"],
       ["Patty Pack", "Patty", 3, 90, "Burger stack material"],
-      ["Cheese Pack", "Cheese", 3, 60, "Needed for Basic Burger + Mystery"],
-      ["Lettuce Pack", "Lettuce", 3, 45, "Needed for Basic Burger"],
       ["Fries Pack", "Fries", 3, 75, "Classic meal side"],
       ["Soda Pack", "Soda", 3, 75, "Classic meal drink"],
       ["Sauce Pack", "Sauce", 3, 120, "Important craft bottleneck"],
-      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key"],
+      ["Mystery Ticket", "Mystery Ticket", 1, 300, "Mystery Meal key", false],
       ["Recipe Fragment", "Recipe Fragment", 1, 1000, "Rare recipe progress", false],
       ["Secret Receipt", "Secret Receipt", 1, 3500, "Hidden Menu utility", true],
       ["Craft Entry", "Craft Entry", 1, 750, "Future premium action", false]
@@ -1907,7 +1627,7 @@
       <div class="modal-panel">
         <div class="season-badge">KITCHEN SHOP</div>
         <h3>Buy Materials</h3>
-        <p>Buy materials with spendable Kitchen Credits. Load credits onchain once, then buy fast without opening Phantom for every ingredient.</p>
+        <p>Use $MEAL balance to buy missing materials. Actions are saved on the backend.</p>
         <div class="action-list">
           ${shop.map(([label,item,qty,price,note,locked]) => `
             <div class="action-row ${locked ? "locked-row" : ""}">
@@ -1920,36 +1640,17 @@
       </div>
     `;
 
-    const loadHtml = `
-      <div class="modal-panel">
-        <div class="season-badge">ONCHAIN LOAD</div>
-        <h3>Load Kitchen Credits</h3>
-        <p>Load 10,000 spendable Kitchen Credits with one real $MEAL wallet transaction. You keep fast gameplay after the load.</p>
-        <div class="item-list">
-          <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Total Wallet Payment</strong><span>One Phantom transaction</span></div><strong>10,000 $MEAL</strong></div>
-          <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burn</strong><span>Real onchain Token-2022 burn</span></div><strong>2,000 $MEAL</strong></div>
-          <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Reward Vault</strong><span>Funds future rewards / claims</span></div><strong>7,000 $MEAL</strong></div>
-          <div class="item-row"><div class="pixel-icon">👑</div><div><strong>Treasury</strong><span>Project revenue / operations</span></div><strong>1,000 $MEAL</strong></div>
-          <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>You receive</strong><span>Spendable in-game Kitchen Credits</span></div><strong>10,000 Credits</strong></div>
-        </div>
-        <br />
-        <div class="station-status"><strong>Important:</strong> Keep at least 10,000 $MEAL in your wallet after loading, otherwise the Kitchen holder gate may lock on the next sync.</div>
-        <br />
-        <button class="primary-btn" data-load-credits="10000">LOAD 10,000 CREDITS</button>
-      </div>
-    `;
-
     const sellHtml = `
       <div class="modal-panel">
         <div class="season-badge">SELL COUNTER</div>
         <h3>Sell Crafted Meals</h3>
-        <p>Sell crafted meals back to the Kitchen Buyer. Auto payouts use the capped Payout Hot Wallet. Legendary and Golden claims are queued for manual review to protect the hot wallet.</p>
+        <p>Sell crafted meals back to the Kitchen Buyer. Actions are saved on the backend.</p>
         <div class="action-list">
           ${sell.map(([item, price, note]) => `
             <div class="action-row">
               <div class="pixel-icon">${icon(item)}</div>
-              <div><strong>${item}</strong><span>Own x${state.inventory[item] || 0} · Sell ${price} $MEAL · ${isHighValueSellItem(item) ? "High value claim / manual review" : note}</span></div>
-              <button class="small-btn gold" data-sell="${item}" data-price="${price}" ${(state.inventory[item] || 0) ? "" : "disabled"}>${isHighValueSellItem(item) ? "CLAIM" : "SELL"}</button>
+              <div><strong>${item}</strong><span>Own x${state.inventory[item] || 0} · Sell ${price} $MEAL · ${note}</span></div>
+              <button class="small-btn gold" data-sell="${item}" data-price="${price}" ${(state.inventory[item] || 0) ? "" : "disabled"}>SELL</button>
             </div>
           `).join("")}
         </div>
@@ -1960,14 +1661,12 @@
       <div class="modal-panel">
         <div class="season-badge">TOKEN SETTLEMENT</div>
         <h3>Market Logic</h3>
-        <p>MC Meal now separates wallet holdings from spendable Kitchen Credits.</p>
+        <p>$MEAL actions are backend-synced. Real token settlement activates with wallet signatures and transaction checks.</p>
         <div class="roadmap">
-          <div><strong>Load Credits:</strong> one onchain $MEAL transaction adds spendable Kitchen Credits</div>
-          <div><strong>Split:</strong> 20% burn · 70% Reward Vault · 10% Treasury</div>
-          <div><strong>Materials:</strong> bought quickly with Kitchen Credits, no Phantom popup per item</div>
-          <div><strong>Mystery Craft:</strong> still uses a real 450 burn + 50 Reward Vault transaction</div>
-          <div><strong>Sell Payout:</strong> crafted meals can pay real $MEAL from a capped Payout Hot Wallet when live mode is enabled</div>
-          <div><strong>High Value:</strong> Legendary and Golden sells are queued for manual review, not auto-paid</div>
+          <div><strong>Buy real:</strong> wallet signs $MEAL payment → backend verifies tx → item delivered</div>
+          <div><strong>Sell real:</strong> backend removes meal → creates payout or claim credit</div>
+          <div><strong>Replay protection:</strong> every Solana signature is stored once</div>
+          <div><strong>Safety:</strong> daily limits, rate limits and suspicious action logs</div>
         </div>
       </div>
     `;
@@ -1975,24 +1674,22 @@
     setContent(`
       <div class="market-tabs">
         <button class="market-tab ${activeTab === "buy" ? "active" : ""}" data-tab="buy">BUY</button>
-        <button class="market-tab ${activeTab === "load" ? "active" : ""}" data-tab="load">LOAD CREDITS</button>
         <button class="market-tab ${activeTab === "sell" ? "active" : ""}" data-tab="sell">SELL</button>
         <button class="market-tab ${activeTab === "market" ? "active" : ""}" data-tab="market">MARKET PLAN</button>
       </div>
 
       <div class="modal-grid">
         <div class="modal-panel">
-          <h3>Kitchen Balances</h3>
+          <h3>Shop Balance</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Tier Holdings</strong><span>Live onchain $MEAL for access/tier only</span></div><strong>${formatMealAmount(state.onchainMealBalance || 0)}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🎮</div><div><strong>Kitchen Credits</strong><span>Spendable balance loaded/earned in-game</span></div><strong>${formatMealAmount(state.meal || 0)}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>$MEAL Balance</strong><span>$MEAL kitchen balance</span></div><strong>${state.meal}</strong></div>
             <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Burned</strong><span>Backend burn counter</span></div><strong>${state.burned}</strong></div>
             <div class="item-row"><div class="pixel-icon">🏦</div><div><strong>Craft Pool</strong><span>20% pool counter</span></div><strong>${state.rewardPool || 0}</strong></div>
           </div>
           <br />
-          <div class="station-status"><strong>Kitchen:</strong> Wallet holdings are for tiers. Materials spend Kitchen Credits. Use LOAD CREDITS to fund credits onchain.</div>
+          <div class="station-status"><strong>Kitchen:</strong> Shop actions are backend-synced. Real $MEAL settlement comes after wallet signatures and tx checks.</div>
         </div>
-        ${activeTab === "buy" ? buyHtml : activeTab === "load" ? loadHtml : activeTab === "sell" ? sellHtml : marketHtml}
+        ${activeTab === "buy" ? buyHtml : activeTab === "sell" ? sellHtml : marketHtml}
       </div>
     `);
 
@@ -2000,84 +1697,27 @@
       btn.addEventListener("click", () => renderShopModal(btn.dataset.tab));
     });
 
-
-    document.querySelectorAll("[data-load-credits]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (!requireWallet("load credits")) return renderShopModal("load");
-
-        try {
-          const signature = await payMealOnchain(LOAD_CREDITS_ACTION);
-
-          const result = await backendCall(BACKEND.endpoints.loadCredits, {
-            walletAddress: state.wallet,
-            actionType: LOAD_CREDITS_ACTION,
-            paymentSignature: signature,
-            signature
-          }, 30000);
-
-          syncBackendState(result);
-
-          addLog(`Loaded ${formatMealAmount(result.creditsLoaded || LOAD_CREDITS_AMOUNT)} Kitchen Credits onchain. Burned ${formatMealAmount(result.burnedMeal || LOAD_CREDITS_BURN_MEAL)} $MEAL · ${formatMealAmount(result.rewardVaultMeal || LOAD_CREDITS_REWARD_MEAL)} to Reward Vault · ${formatMealAmount(result.treasuryMeal || LOAD_CREDITS_TREASURY_MEAL)} to Treasury.`);
-        } catch (err) {
-          const backendError = err?.data?.error || err?.message || "load_credits_failed";
-          console.log("MCMEAL LOAD CREDITS ERROR:", err?.data || err);
-          addLog(`Load Credits failed: ${backendError}.`);
-        }
-
-        renderShopModal("load");
-      });
-    });
-
     document.querySelectorAll("[data-buy]").forEach(btn => {
       btn.addEventListener("click", async () => {
         const item = btn.dataset.buy;
-
-        if (!requireWallet("shop buys")) {
-          return renderShopModal("buy");
-        }
-
+        if (!requireWallet("shop buys")) return renderShopModal("buy");
         try {
-          const itemId = SHOP_ITEM_IDS[item] || item;
-
-          console.log("MCMEAL SHOP BUY REQUEST:", {
-            walletAddress: state.wallet,
-            itemId,
-            itemName: item
-          });
-
           const result = await backendCall(BACKEND.endpoints.shopBuy, {
             walletAddress: state.wallet,
-            itemId,
-            shopItemId: itemId,
-            itemName: item
+            shopItemId: SHOP_ITEM_IDS[item]
           });
-
-          console.log("MCMEAL SHOP BUY RESULT:", result);
-
           syncBackendState(result);
-
-          const boughtQty = result.qty ?? result.amount ?? 0;
-          const boughtItem = result.item ?? result.itemName ?? item;
-          addLog(`Bought ${boughtQty}x ${boughtItem} with Kitchen Credits.`);
+          addLog(`Bought ${result.qty}x ${result.item}. ${result.burned} $MEAL burned, ${result.pool} to pool.`);
         } catch (err) {
           const msg = err?.message || "shop_buy_failed";
-          const backendError = err?.data?.error || msg;
-
-          console.log("MCMEAL SHOP BUY ERROR:", err?.data || err);
-
           addLog(
-            (backendError === "insufficient_kitchen_meal_balance" || backendError === "insufficient_kitchen_credits")
-              ? `Shop buy failed: not enough Kitchen Credits for ${item}. Use LOAD CREDITS first.`
-              : backendError === "not_meal_holder"
-                ? `Shop buy failed: wallet is not detected as $MEAL holder.`
-                : backendError === "unknown_shop_item"
-                  ? `Shop buy failed: unknown shop item ${item}.`
-                  : backendError === "item_locked_coming_soon"
-                    ? `${item} is coming soon. Hidden Menu utility is not active yet.`
-                    : `Shop buy failed: ${backendError}.`
+            msg === "not_enough_meal"
+              ? `Shop buy failed: not enough $MEAL for ${item}.`
+              : msg === "item_locked_coming_soon"
+                ? `${item} is coming soon. Hidden Menu utility is not active yet.`
+                : `Shop buy failed: ${msg}.`
           );
         }
-
         renderShopModal("buy");
       });
     });
@@ -2093,32 +1733,10 @@
             qty: 1
           });
           syncBackendState(result);
-
-          if (result.payoutStatus === "paid_onchain") {
-            const sig = result.payoutTxSignature || result.txSignature;
-            addLog(`Sold ${result.qty}x ${result.itemName}. Paid ${result.mealAmount} $MEAL onchain from Payout Hot Wallet. ${solscanTxLink(sig)}`);
-          } else if (result.payoutStatus === "dry_run") {
-            addLog(`Sell dry-run logged for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Item was not removed because payout live mode is OFF.`);
-          } else if (result.payoutStatus === "queued_high_value") {
-            addLog(`High value claim queued for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Manual review required; item was not removed yet.`);
-          } else if (result.payoutStatus === "queued") {
-            addLog(`Sell payout queued for ${result.qty}x ${result.itemName}: ${result.mealAmount} $MEAL. Item was not removed until payout is processed.`);
-          } else {
-            addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
-          }
+          addLog(`Sold ${result.qty}x ${result.itemName} for ${result.mealAmount} $MEAL.`);
         } catch (err) {
-          const msg = err?.data?.error || err?.message || "shop_sell_failed";
-          console.log("MCMEAL SHOP SELL ERROR:", err?.data || err);
-
-          addLog(
-            msg === "missing_item"
-              ? `Sell failed: missing ${item}.`
-              : msg === "not_meal_holder"
-                ? "Sell failed: wallet is not detected as $MEAL holder."
-                : msg === "unknown_sell_item"
-                  ? `Sell failed: unknown sell item ${item}.`
-                  : `Sell failed: ${msg}.`
-          );
+          const msg = err?.message || "shop_sell_failed";
+          addLog(msg === "missing_item" ? `Sell failed: missing ${item}.` : `Sell failed: ${msg}.`);
         }
         renderShopModal("sell");
       });
@@ -2159,197 +1777,31 @@
     `);
   }
 
-  const LEADERBOARD_VIEWS = [
-    { mode: "overall", gameId: "all", label: "OVERALL", subtitle: "One row per chef · ranked by Chef XP" },
-    { mode: "game", gameId: "burger-stack", label: "BURGER", subtitle: "Burger Stack best score" },
-    { mode: "game", gameId: "fry-rush", label: "FRY", subtitle: "Fry Rush best score" },
-    { mode: "game", gameId: "soda-sprint", label: "SODA", subtitle: "Soda Sprint best score" },
-    { mode: "game", gameId: "mystery-order-rush", label: "MYSTERY", subtitle: "Mystery Order best score" },
-    { mode: "recent", gameId: "all", label: "RECENT", subtitle: "Raw run history" }
-  ];
-
-  function leaderboardActiveLabel() {
-    const found = LEADERBOARD_VIEWS.find(v => v.mode === lastLeaderboardQuery.mode && v.gameId === lastLeaderboardQuery.gameId);
-    return found ? found.label : "OVERALL";
-  }
-
-  function leaderboardRankIcon(index) {
-    if (index === 0) return "🏆";
-    if (index === 1) return "🥈";
-    if (index === 2) return "🥉";
-    return "⭐";
-  }
-
-  function leaderboardRowHtml(row, index) {
-    const name = row.username || shortWallet(row.wallet_address || "");
-    const mode = row.kind || lastLeaderboardQuery.mode || "overall";
-    const game = row.game_name || row.game_id || "Mini Game";
-    const date = row.created_at ? new Date(row.created_at).toLocaleDateString() : "";
-
-    if (mode === "overall") {
-      const xp = Number(row.chef_xp ?? row.xp ?? row.score ?? 0);
-      const best = Number(row.best_score || 0);
-      const runs = Number(row.total_arcade_runs || row.mini_runs || 0);
-      return `
-        <div class="item-row">
-          <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
-          <div><strong>#${index + 1} ${name}</strong><span>Chef XP ${xp.toLocaleString("en-US")} · Best ${best.toLocaleString("en-US")} · Runs ${runs.toLocaleString("en-US")}</span></div>
-          <strong>${xp.toLocaleString("en-US")} XP</strong>
-        </div>
-      `;
-    }
-
-    if (mode === "game") {
-      return `
-        <div class="item-row">
-          <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
-          <div><strong>#${index + 1} ${name}</strong><span>${game} · best run${date ? " · " + date : ""}</span></div>
-          <strong>${Number(row.score || 0).toLocaleString("en-US")}</strong>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="item-row">
-        <div class="pixel-icon">${leaderboardRankIcon(index)}</div>
-        <div><strong>#${index + 1} ${name}</strong><span>${game}${date ? " · " + date : ""}</span></div>
-        <strong>${Number(row.score || 0).toLocaleString("en-US")}</strong>
-      </div>
-    `;
-  }
-
-  function leaderboardTabsHtml() {
-    return `
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 12px;">
-        ${LEADERBOARD_VIEWS.map(view => {
-          const active = view.mode === lastLeaderboardQuery.mode && view.gameId === lastLeaderboardQuery.gameId;
-          return `<button class="small-btn leaderboard-filter-btn" data-mode="${view.mode}" data-game-id="${view.gameId}" style="${active ? "border-color:#ffe25a; color:#ffe25a;" : ""}">${view.label}</button>`;
-        }).join("")}
-      </div>
-    `;
-  }
-
-  function renderLeaderboardModal(extraMessage = "") {
-    const rows = Array.isArray(state.leaderboardRows) ? state.leaderboardRows : [];
-    const username = state.username || "";
-    const shownName = username || shortWallet(state.wallet);
-    const activeView = LEADERBOARD_VIEWS.find(v => v.mode === lastLeaderboardQuery.mode && v.gameId === lastLeaderboardQuery.gameId) || LEADERBOARD_VIEWS[0];
-
+  function renderLeaderboardModal() {
     setContent(`
       <div class="modal-grid">
         <div class="modal-panel">
-          <div class="season-badge">CHEF PROFILE</div>
-          <h3>👤 ${shownName}</h3>
-          <p>Your wallet stays the real identity. The username is your public kitchen name for leaderboards and future claims.</p>
-
+          <h3>Live Kitchen Stats</h3>
           <div class="item-list">
-            <div class="item-row"><div class="pixel-icon">👤</div><div><strong>Username</strong><span>3-16 chars, letters/numbers/_</span></div><strong>${username || "Not set"}</strong></div>
-            <div class="item-row"><div class="pixel-icon">👛</div><div><strong>Wallet</strong><span>Connected identity</span></div><strong>${shortWallet(state.wallet)}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>Tier</strong><span>${state.mealTier?.badge || ""}</span></div><strong>${state.mealTier?.name || "Visitor"}</strong></div>
-            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${Number(state.xp || 0).toLocaleString("en-US")}</strong></div>
-            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${Number(state.bestScore || 0).toLocaleString("en-US")}</strong></div>
+            <div class="item-row"><div class="pixel-icon">⭐</div><div><strong>Chef XP</strong><span>Backend XP</span></div><strong>${state.xp}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🏆</div><div><strong>Best Score</strong><span>Best backend saved run</span></div><strong>${state.bestScore}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🔥</div><div><strong>$MEAL Burned</strong><span>Onchain/game burn</span></div><strong>${state.burned}</strong></div>
+            <div class="item-row"><div class="pixel-icon">🍽️</div><div><strong>Meals Crafted</strong><span>Total crafted meals</span></div><strong>${state.mealsCrafted}</strong></div>
           </div>
-
-          <br />
-          <div class="item-row">
-            <div class="pixel-icon">✍️</div>
-            <div><strong>Set Username</strong><span>Unique. Changes are cooldown-protected.</span></div>
-            <input id="usernameInput" value="${username}" maxlength="16" placeholder="MCMEALCHEF" style="max-width:180px;" />
-          </div>
-          <br />
-          <button class="action-btn" id="saveUsernameBtn">SAVE USERNAME</button>
-          ${extraMessage ? `<div class="warning-box" style="margin-top:12px;">${extraMessage}</div>` : ""}
         </div>
-
         <div class="modal-panel">
-          <div class="season-badge">HOT / COLD WALLET PLAN</div>
-          <h3>🏦 Payout Foundation</h3>
+          <h3>Kitchen Leaderboards</h3>
           <div class="roadmap">
-            <div><strong>Reward Vault</strong> · cold pool proof, not backend signer.</div>
-            <div><strong>Treasury</strong> · operations / project revenue, not backend signer.</div>
-            <div><strong>Payout Hot Wallet</strong> · future small capped wallet for onchain claims.</div>
-            <div><strong>v18 Mode</strong> · payout tables + dry-run foundation only.</div>
+            <div>Daily high score per mini-game: next leaderboard view</div>
+            <div>Most $MEAL burned: tracked</div>
+            <div>Most Mystery Meals crafted: tracked now</div>
+            <div>Golden Meal holders / crafters: tracked</div>
           </div>
-        </div>
-      </div>
-
-      <div class="modal-panel">
-        <div class="season-badge">LEADERBOARD</div>
-        <h3>🏆 Kitchen Leaderboard</h3>
-        <p><strong>Overall</strong> ranks each chef once by total Chef XP. Use game filters for per-game highscores. Recent shows raw run history.</p>
-        ${leaderboardTabsHtml()}
-        <div class="item-row">
-          <div class="pixel-icon">📊</div>
-          <div><strong>${activeView.label}</strong><span>${activeView.subtitle}</span></div>
-          <button class="small-btn" id="refreshLeaderboardBtn">REFRESH</button>
-        </div>
-        <div class="item-list" style="margin-top:12px;">
-          ${rows.length ? rows.map((row, i) => leaderboardRowHtml(row, i)).join("") : `<div class="item-row"><div></div><div><strong>No scores yet</strong><span>Play a rewarded arcade run to enter the board.</span></div><div></div></div>`}
         </div>
       </div>
     `);
-
-    const saveBtn = document.getElementById("saveUsernameBtn");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", async () => {
-        if (!requireWallet("profile username")) return renderLeaderboardModal();
-        const input = document.getElementById("usernameInput");
-        const wanted = normalizeLocalUsername(input?.value || "");
-        const validation = usernameValidationMessage(wanted);
-        if (validation) return renderLeaderboardModal(validation);
-
-        try {
-          const result = await backendCall(BACKEND.endpoints.profileUpdate, {
-            walletAddress: state.wallet,
-            username: wanted
-          });
-          syncBackendState(result);
-          addLog(`Username saved: ${result.username}.`);
-          renderLeaderboardModal("Username saved.");
-        } catch (err) {
-          const msg = err?.data?.error || err?.message || "username_save_failed";
-          console.log("MCMEAL USERNAME ERROR:", err?.data || err);
-          renderLeaderboardModal(`Username save failed: ${msg}.`);
-        }
-      });
-    }
-
-    async function loadLeaderboardForCurrentView(message = "Leaderboard refreshed.") {
-      try {
-        const result = await backendCall(BACKEND.endpoints.leaderboardList, {
-          mode: lastLeaderboardQuery.mode,
-          period: lastLeaderboardQuery.period,
-          gameId: lastLeaderboardQuery.gameId,
-          limit: 10
-        });
-        state.leaderboardRows = result.leaderboard || [];
-        saveState();
-        renderLeaderboardModal(message);
-      } catch (err) {
-        const msg = err?.data?.error || err?.message || "leaderboard_load_failed";
-        console.log("MCMEAL LEADERBOARD ERROR:", err?.data || err);
-        renderLeaderboardModal(`Leaderboard failed: ${msg}.`);
-      }
-    }
-
-    document.querySelectorAll(".leaderboard-filter-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        lastLeaderboardQuery = {
-          ...lastLeaderboardQuery,
-          mode: btn.getAttribute("data-mode") || "overall",
-          gameId: btn.getAttribute("data-game-id") || "all"
-        };
-        await loadLeaderboardForCurrentView(`${leaderboardActiveLabel()} leaderboard loaded.`);
-      });
-    });
-
-    const refreshBtn = document.getElementById("refreshLeaderboardBtn");
-    if (refreshBtn) {
-      refreshBtn.addEventListener("click", async () => {
-        await loadLeaderboardForCurrentView("Leaderboard refreshed.");
-      });
-    }
   }
+
 
   function renderDailyModal() {
     const today = window.MCMealSave ? window.MCMealSave.todayKey() : new Date().toISOString().slice(0, 10);
@@ -2404,18 +1856,8 @@
           syncBackendState(result);
           addLog(`Daily claimed: streak ${result.streak}. +${result.xpEarned} XP.`);
         } catch (err) {
-          const backendError = err?.data?.error || err?.message || "daily_claim_failed";
-          console.log("MCMEAL DAILY CLAIM ERROR:", err?.data || err);
-
-          if (err?.data) syncBackendState(err.data);
-
-          if (backendError === "already_claimed_today") {
-            addLog("Daily already claimed today. Come back tomorrow.");
-          } else if (backendError === "not_meal_holder" || backendError === "access_locked") {
-            addLog("Daily claim failed: hold at least 10,000 $MEAL to use Daily Kitchen rewards.");
-          } else {
-            addLog(`Daily claim failed: ${backendError}.`);
-          }
+          const msg = err?.message || "daily_claim_failed";
+          addLog(msg === "already_claimed_today" ? "Daily already claimed today." : `Daily claim failed: ${msg}.`);
         }
         renderDailyModal();
       });
@@ -2435,122 +1877,54 @@
   async function connectWalletAndSync(resultEl, hideStartAfterSuccess = false) {
     try {
       if (!window.solana || !window.solana.isPhantom) {
-        if (resultEl) {
-          resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
-        }
+        if (resultEl) resultEl.innerHTML = `<div class="warning-box">Phantom wallet not detected. Install Phantom or use a browser with Solana wallet support.</div>`;
         return false;
       }
 
-      if (resultEl) {
-        resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking $MEAL holder access...</div>`;
-      }
+      if (resultEl) resultEl.innerHTML = `<div class="station-status">Connecting Phantom and checking Kitchen access...</div>`;
 
       const resp = await window.solana.connect({ onlyIfTrusted: false });
       const address = resp.publicKey.toString();
-      const previousWallet = state.wallet || null;
-
-      console.log("MCMEAL CONNECTED WALLET:", address);
-
-      if (previousWallet && previousWallet !== address) {
-        addLog(`Wallet switched: ${shortWallet(previousWallet)} → ${shortWallet(address)}. Local wallet-scoped state reset before backend sync.`);
-        resetWalletScopedLocalState(address);
-      }
 
       const access = await backendCall(BACKEND.endpoints.checkAccess, {
         walletAddress: address
       });
 
-      console.log("MCMEAL CHECK ACCESS RESPONSE:", access);
-
-      const balance = Number(access.mealBalance ?? access.balance ?? 0);
-      const tier = access.tier && access.tier.name ? access.tier : getMealTier(balance);
-
-      const accessGranted = Boolean(
-        access.allowed === true ||
-        access.access === true ||
-        access.holder === true
-      );
-
-      if (!accessGranted) {
+      if (!access.allowed) {
         state.wallet = null;
         state.prelaunchAccess = false;
         state.backendSynced = false;
         saveState();
-
-        if (resultEl) {
-          resultEl.innerHTML = `
-            <div class="warning-box">
-              <strong>Access locked.</strong><br />
-              Wallet ${shortWallet(address)} is not detected as a $MEAL holder.<br />
-              Required: Hold at least 10,000 $MEAL.<br />
-              Detected balance: ${formatMealAmount(balance)} $MEAL<br /><br />
-              <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
-            </div>
-          `;
-        }
-
+        if (resultEl) resultEl.innerHTML = accessDeniedMessage(address);
         return false;
       }
 
+      // v10.3: Do not call a public Solana RPC from the browser during connect.
+      // Holder balance is checked server-side by check-access. This prevents wallet connect from hanging
+      // when public RPC endpoints rate-limit/CORS-block browser requests.
+      let balance = Number(access.mealBalance || access.balance || MIN_MEAL_BALANCE);
+      let balanceText = access.mealBalance
+        ? `$MEAL balance found: ${access.mealBalance}`
+        : "Kitchen access granted. $MEAL holder access is active.";
+
+      // v10.4: profile-connect is no longer required for entering the Kitchen.
+      // check-access is the source of truth for holder access. Some Supabase projects can keep
+      // profile-connect on an older/blocked deployment and return 403; this must not block live access.
+      syncBackendState(access);
       state.wallet = address;
       state.prelaunchAccess = true;
       state.backendSynced = true;
-      state.accessTier = tier.name;
-      state.mealTier = tier;
-      state.onchainMealBalance = balance;
-
       saveState();
 
-      let profile = null;
-
-      try {
-        profile = await backendCall(BACKEND.endpoints.profileConnect, {
-          walletAddress: address,
-          mealBalance: balance
-        });
-
-        console.log("MCMEAL PROFILE CONNECT RESPONSE:", profile);
-
-        syncBackendState(profile);
-
-        state.wallet = address;
-        state.prelaunchAccess = true;
-        state.backendSynced = true;
-
-        saveState();
-      } catch (profileErr) {
-        console.log("MCMEAL PROFILE CONNECT ERROR:", profileErr?.data || profileErr);
-
-        state.wallet = address;
-        state.prelaunchAccess = true;
-        state.backendSynced = true;
-        state.accessTier = tier.name;
-        state.mealTier = tier;
-
-        saveState();
-
-        addLog(`Wallet holder access granted, but profile sync needs review: ${profileErr?.data?.error || profileErr?.message || "profile_connect_failed"}.`);
-      }
-
       if (resultEl) {
-        if (resultEl.id === "walletResult") {
-          resultEl.innerHTML = `<div class="station-status">Wallet refreshed. Updating Kitchen Access view...</div>`;
-          setTimeout(() => {
-            if (modalOpen && document.getElementById("modalTitle")?.textContent === "LAUNCH") {
-              renderLaunchModal();
-            }
-          }, 50);
-        } else {
-          resultEl.innerHTML = `
-            <div class="wallet-card">
-              <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
-              <div class="wallet-row"><span>Access Tier</span><strong>${tier.name}</strong></div>
-              <div class="wallet-row"><span>Badge</span><strong>${tier.badge}</strong></div>
-              <div class="wallet-row"><span>$MEAL Balance</span><strong>${formatMealAmount(balance)}</strong></div>
-              <div class="wallet-row"><span>Backend</span><strong>${profile ? "Synced" : "Access granted, profile sync skipped"}</strong></div>
-            </div>
-          `;
-        }
+        resultEl.innerHTML = `
+          <div class="wallet-card">
+            <div class="wallet-row"><span>Wallet</span><strong>${shortWallet(address)}</strong></div>
+            <div class="wallet-row"><span>Access</span><strong>Kitchen Access</strong></div>
+            <div class="wallet-row"><span>Backend</span><strong>Live Sync</strong></div>
+            <div class="wallet-row"><span>Status</span><strong>${balanceText}</strong></div>
+          </div>
+        `;
       }
 
       if (hideStartAfterSuccess) {
@@ -2558,30 +1932,17 @@
         if (start) start.classList.add("hidden");
       }
 
-      addLog(`Wallet synced: ${shortWallet(address)} · ${tier.name} granted.`);
-
+      addLog(`Wallet synced: ${shortWallet(address)}.`);
       return true;
     } catch (err) {
       const msg = err?.message || "wallet_connection_failed";
-      const backendError = err?.data?.error || msg;
-
-      console.log("MCMEAL WALLET CONNECT ERROR:", err?.data || err);
-
       if (resultEl) {
-        if (backendError === "not_meal_holder" || backendError === "access_locked_prelaunch" || err?.status === 403) {
-          resultEl.innerHTML = `
-            <div class="warning-box">
-              <strong>Access locked.</strong><br />
-              This wallet does not have Kitchen access yet.<br />
-              Hold at least 10,000 $MEAL.<br /><br />
-              <a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a>
-            </div>
-          `;
+        if (msg === "access_locked_prelaunch" || err?.status === 403) {
+          resultEl.innerHTML = `<div class="warning-box"><strong>Access locked.</strong><br />This wallet does not have Kitchen access yet. Hold at least 10,000 $MEAL.<br /><br /><a href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer">BUY $MEAL</a></div>`;
         } else {
-          resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${backendError}</div>`;
+          resultEl.innerHTML = `<div class="warning-box">Wallet connection or backend sync failed: ${msg}</div>`;
         }
       }
-
       return false;
     }
   }
@@ -2591,10 +1952,34 @@
   }
 
   async function fetchMealBalance(walletAddress) {
-    // v13: do not query Solana public RPC directly from the browser.
-    // Holder balance is fetched through the server-side check-access function.
-    const data = await backendCall(BACKEND.endpoints.checkAccess, { walletAddress }, 15000);
-    return Number(data?.balance || data?.mealBalance || 0);
+    const cfg = await loadConfig();
+    if (!cfg || !cfg.MEAL_MINT || cfg.MEAL_MINT.includes("REPLACE")) cfg = { MEAL_MINT: OFFICIAL_MEAL_MINT, SOLANA_RPC: "https://solana-rpc.publicnode.com" };
+
+    const body = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getTokenAccountsByOwner",
+      params: [
+        walletAddress,
+        { mint: cfg.MEAL_MINT },
+        { encoding: "jsonParsed" }
+      ]
+    };
+
+    const res = await fetch(cfg.SOLANA_RPC || "https://solana-rpc.publicnode.com", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    const accounts = data?.result?.value || [];
+    let total = 0;
+    for (const acc of accounts) {
+      const ui = acc?.account?.data?.parsed?.info?.tokenAmount?.uiAmount || 0;
+      total += Number(ui);
+    }
+    return total;
   }
 
   async function loadConfig() {
@@ -2612,12 +1997,7 @@
 
   function renderLaunchModal() {
     const walletText = state.wallet ? `${state.wallet.slice(0, 6)}...${state.wallet.slice(-6)}` : "Not connected";
-    const currentTier = state.mealTier || getMealTier(state.onchainMealBalance || 0);
-    const tier = state.accessTier || currentTier.name || "Visitor";
-    const currentBalance = formatMealAmount(state.onchainMealBalance || 0);
-    const isConnected = Boolean(state.wallet && state.backendSynced);
-    const connectButtonLabel = isConnected ? "REFRESH WALLET / TIER" : "CONNECT PHANTOM";
-    const syncText = isConnected ? "Synced" : "Connect required";
+    const tier = state.accessTier || "Visitor";
 
     setContent(`
       <div class="big-cta">
@@ -2628,21 +2008,18 @@
       <div class="modal-grid">
         <div class="modal-panel">
           <div class="season-badge">KITCHEN ACCESS</div>
-          <h3>Wallet Access</h3>
-          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. If you are already connected, use refresh only after switching wallets or buying more $MEAL.</p>
+          <h3>Wallet Connect</h3>
+          <p>Connect Phantom to open the Kitchen. Holder access starts at <strong>10,000 $MEAL</strong>. Use the official $MEAL link below.</p>
 
           <div class="wallet-card">
             <div class="wallet-row"><span>Wallet</span><strong>${walletText}</strong></div>
             <div class="wallet-row"><span>Access Tier</span><strong>${tier}</strong></div>
-            <div class="wallet-row"><span>Badge</span><strong>${currentTier.badge || "Locked"}</strong></div>
-            <div class="wallet-row"><span>Wallet $MEAL</span><strong>${currentBalance}</strong></div>
-            <div class="wallet-row"><span>Next Step</span><strong>${tierProgressText(state.onchainMealBalance || 0)}</strong></div>
-            <div class="wallet-row"><span>Backend Sync</span><strong>${syncText}</strong></div>
+            <div class="wallet-row"><span>Backend Sync</span><strong>Active after connect</strong></div>
             <div class="wallet-row"><span>Official Mint</span><strong style="overflow-wrap:anywhere;">EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump</strong></div>
           </div>
 
           <br />
-          <button class="action-btn" id="connectWalletBtn">${connectButtonLabel}</button>
+          <button class="action-btn" id="connectWalletBtn">CONNECT PHANTOM</button>
           <a class="small-btn gold" href="https://pump.fun/coin/EP5KFRnhXfrqGuZAmogpsQ88q2xHdBnLnAhwGRKspump" target="_blank" rel="noopener noreferrer" style="display:inline-block;text-decoration:none;margin-top:10px;">BUY $MEAL</a>
           <div id="walletResult" style="margin-top:12px;"></div>
         </div>
@@ -2650,11 +2027,11 @@
         <div class="modal-panel">
           <h3>Kitchen Access Tiers</h3>
           <div class="roadmap">
-            <div><strong>Basic Kitchen</strong> 10,000 $MEAL · +5% XP · Kitchen access</div>
-            <div><strong>Grill Access</strong> 50,000 $MEAL · +10% XP · +5% sell bonus</div>
-            <div><strong>Golden Kitchen</strong> 100,000 $MEAL · +15% XP · +10% sell bonus</div>
-            <div><strong>Legendary Kitchen</strong> 250,000 $MEAL · +20% XP · +15% sell bonus</div>
-            <div><strong>Note</strong> Sell bonuses are added to eligible sell payouts. High value Legendary / Golden claims use manual review.</div>
+            <div><strong>Access</strong> 10,000 $MEAL required</div>
+            <div><strong>Basic Kitchen</strong> 10,000 $MEAL</div>
+            <div><strong>Grill Access</strong> 50,000 $MEAL</div>
+            <div><strong>Golden Kitchen</strong> 250,000 $MEAL</div>
+            <div><strong>Legendary Kitchen</strong> 1,000,000 $MEAL</div>
           </div>
         </div>
       </div>
@@ -2668,8 +2045,6 @@
             <div>Daily claim per wallet: live</div>
             <div>Run submit API with duplicate protection: live</div>
             <div>Craft + shop verification: live</div>
-            <div>Sell payout hot wallet: live with caps</div>
-            <div>Mystery Craft onchain: 450 $MEAL burn + 50 $MEAL Reward Vault</div>
           </div>
         </div>
 
@@ -2680,7 +2055,6 @@
             <div>4 real games: rewards connected</div>
             <div>Supabase save: active</div>
             <div>Wallet profile: active</div>
-            <div>Reward Vault: FLEsGSAvXtiQLXMZwLs3995HPWixDYEAUA4roEsNb7nV</div>
           </div>
         </div>
       </div>

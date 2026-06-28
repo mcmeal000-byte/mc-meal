@@ -1,16 +1,21 @@
-# MC Meal – Mystery Order Rush MVP v3
+# MC Meal – Kitchen Rush v17 Customer Fix + Clean Cookline
 
-Finalized code version of the updated Mystery Order Rush mini-game.
+Targeted fix based on the annotated screenshot.
 
-## v3 Changes
-- Claw replaced with a more real pixel-art hand.
-- Controls and UI text updated from claw/picker to hand.
-- Full working code package included: `index.html`, `style.css`, `game.js`.
-- Same minimalist MC Meal game style as the rest of the arcade.
+## Fixes
+1. Ingredient zone enlarged so source stations no longer look like they spill outside the box.
+2. Customers restored in a clean top-wall customer queue, not inside the work zone.
+3. Service label moved higher so it is readable and no longer fights with PLATES/TRASH/SERVE labels.
+4. Removed the remaining PREP station near the cook line.
+5. Bottom cook line remains:
+   - 2x GRILL
+   - 2x FRYER
+6. If an order expires, the first customer gets angry with a visible speech bubble.
 
-## Gameplay
-- Move the hand left/right.
-- Pick conveyor ingredients in the correct order.
-- Complete customer tickets.
-- Wrong picks stay red in the tray and cost lives.
-- Clear all 10 levels.
+## Hub
+`MCMEAL_GAME_RESULT` compatibility is preserved.
+
+## Files
+- index.html
+- style.css
+- game.js
