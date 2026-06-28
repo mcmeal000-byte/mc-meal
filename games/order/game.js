@@ -742,17 +742,48 @@
   }
 
   function drawTitle() {
-    drawBackground(); drawKitchen(); drawStations();
-    rounded(88,74,624,478,18,"rgba(13,15,20,.90)",C.gold,4);
-    ctx.fillStyle=C.meal;ctx.font="900 56px Arial";ctx.fillText("MC MEAL",252,155);
-    ctx.fillStyle=C.cream;ctx.font="900 32px Arial";ctx.fillText("KITCHEN RUSH",238,198);
-    ctx.font="16px Courier New";ctx.fillText("Bigger stations. Clear layout. Real plate-building flow.",145,250);
-    ctx.fillStyle=C.paper;ctx.font="bold 15px Courier New";
-    ctx.fillText("BURGER: plate + bun + cheese + chopped tomato + chopped lettuce + grilled patty",126,303);
-    ctx.fillText("SALAD: plate + chopped tomato + chopped lettuce",126,333);
-    ctx.fillText("FRIES: potato into fryer, serve cooked fries",126,363);
-    ctx.fillStyle=C.cyan;ctx.font="bold 18px Courier New";ctx.fillText("WASD / ARROWS move    E / ACTION interact",180,430);
-    ctx.fillStyle=C.meal;ctx.fillText("PRESS ENTER OR TAP TO START",235,484);
+    drawBackground();
+    drawKitchen();
+    drawStations();
+
+    // v10.6: larger, darker, cleaner intro overlay for readability inside hub modal.
+    rounded(112, 66, 736, 548, 18, "rgba(10,12,18,.96)", C.gold, 5);
+
+    ctx.fillStyle = C.meal;
+    ctx.font = "900 58px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("MC MEAL", W / 2, 145);
+
+    ctx.fillStyle = C.cream;
+    ctx.font = "900 36px Arial";
+    ctx.fillText("KITCHEN RUSH", W / 2, 190);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.cyan;
+    ctx.font = "900 20px Arial";
+    ctx.fillText("Your shift:", 190, 258);
+
+    ctx.fillStyle = C.cream;
+    ctx.font = "900 19px Arial";
+    const lines = [
+      "• Take customer orders",
+      "• Prepare ingredients",
+      "• Cook and serve meals",
+      "• Keep the kitchen moving"
+    ];
+    lines.forEach((line, i) => ctx.fillText(line, 214, 298 + i * 34));
+
+    rounded(188, 454, 584, 88, 10, "rgba(32,19,24,.92)", C.cyan, 3);
+    ctx.fillStyle = C.cyan;
+    ctx.font = "900 18px Arial";
+    ctx.fillText("WASD / ARROWS = MOVE", 224, 489);
+    ctx.fillText("E / ACTION = INTERACT", 510, 489);
+
+    ctx.fillStyle = C.meal;
+    ctx.font = "900 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("PRESS ENTER OR TAP TO START", W / 2, 575);
+    ctx.textAlign = "left";
   }
 
   function drawResult() {

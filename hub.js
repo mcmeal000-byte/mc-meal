@@ -1057,7 +1057,9 @@
 
   function closeModal() {
     modalOpen = false;
-    document.getElementById("modal").classList.add("hidden");
+    const modal = document.getElementById("modal");
+    modal.classList.remove("game-modal");
+    modal.classList.add("hidden");
   }
 
   function renderArcadeModal(extraMessage = "") {
@@ -1169,6 +1171,7 @@
     };
 
     setModalHeader(gameName, runModeLabel(runMode));
+    document.getElementById("modal").classList.add("game-modal");
 
     const noteText = runMode === "paid"
       ? `Extra rewarded run active. Onchain payment confirmed: ${EXTRA_RUN_BURN_MEAL} $MEAL burned + ${EXTRA_RUN_POOL_MEAL} $MEAL sent to Reward Vault.`
@@ -1180,7 +1183,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-v10-5-mystery-rush" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-v10-6-ui-polish" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1191,8 +1194,8 @@
       </div>
     `);
 
-    document.getElementById("backToArcadeReal").addEventListener("click", () => renderArcadeModal());
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-5-mystery-rush`, "_blank"));
+    document.getElementById("backToArcadeReal").addEventListener("click", () => { document.getElementById("modal").classList.remove("game-modal"); renderArcadeModal(); });
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-6-ui-polish`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1472,13 +1475,14 @@
     };
 
     setModalHeader("Mystery Kitchen Rush", "500 $MEAL · 450 burn + 50 Reward Vault");
+    document.getElementById("modal").classList.add("game-modal");
     setContent(`
       <div class="real-game-wrap">
         <div class="game-launch-note" id="realGameRewardNote">
           <strong>Mystery Kitchen Rush active.</strong> Finish the kitchen run, then confirm the Mystery reveal transaction: <strong>${MYSTERY_CRAFT_BURN_MEAL} $MEAL burn + ${MYSTERY_CRAFT_POOL_MEAL} $MEAL Reward Vault</strong>. Max 3 attempts per wallet/day.
         </div>
 
-        <iframe class="real-game-frame" src="games/order/index.html?v=live-v10-5-mystery-rush" title="Mystery Kitchen Rush" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="games/order/index.html?v=live-v10-6-ui-polish" title="Mystery Kitchen Rush" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1491,9 +1495,10 @@
 
     document.getElementById("backToCraftFromMystery").addEventListener("click", () => {
       activeMysteryCraftRun = null;
+      document.getElementById("modal").classList.remove("game-modal");
       renderCraftModal();
     });
-    document.getElementById("openMysteryGameNewTab").addEventListener("click", () => window.open("games/order/index.html?v=live-v10-5-mystery-rush", "_blank"));
+    document.getElementById("openMysteryGameNewTab").addEventListener("click", () => window.open("games/order/index.html?v=live-v10-6-ui-polish", "_blank"));
     document.getElementById("closeMysteryGame").addEventListener("click", () => {
       activeMysteryCraftRun = null;
       closeModal();

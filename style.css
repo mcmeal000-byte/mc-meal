@@ -350,6 +350,68 @@ canvas {
   font-weight: bold;
 }
 
+
+/* v10.6 game modal polish: larger game windows, no nested scrollbar */
+.modal.game-modal {
+  padding: 10px;
+  place-items: center;
+}
+
+.modal.game-modal .modal-card {
+  width: min(1180px, 96vw);
+  height: min(940px, 94vh);
+  max-height: 94vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.modal.game-modal .modal-header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.modal.game-modal .modal-header h2 {
+  font-size: 30px;
+}
+
+.modal.game-modal .modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.real-game-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal.game-modal .game-launch-note {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 12px;
+}
+
+.modal.game-modal .real-game-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  border: 4px solid #0f1118;
+  background: #111;
+}
+
+.modal.game-modal .game-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
 @media (max-width: 860px) {
   body {
     padding: 8px;
@@ -483,6 +545,68 @@ canvas {
   padding: 10px;
   line-height: 1.45;
   color: #ffb5a8;
+}
+
+
+/* v10.6 game modal polish: larger game windows, no nested scrollbar */
+.modal.game-modal {
+  padding: 10px;
+  place-items: center;
+}
+
+.modal.game-modal .modal-card {
+  width: min(1180px, 96vw);
+  height: min(940px, 94vh);
+  max-height: 94vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.modal.game-modal .modal-header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.modal.game-modal .modal-header h2 {
+  font-size: 30px;
+}
+
+.modal.game-modal .modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.real-game-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal.game-modal .game-launch-note {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 12px;
+}
+
+.modal.game-modal .real-game-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  border: 4px solid #0f1118;
+  background: #111;
+}
+
+.modal.game-modal .game-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
 }
 
 @media (max-width: 860px) {
@@ -679,6 +803,68 @@ canvas {
   font-size: 12px;
 }
 
+
+/* v10.6 game modal polish: larger game windows, no nested scrollbar */
+.modal.game-modal {
+  padding: 10px;
+  place-items: center;
+}
+
+.modal.game-modal .modal-card {
+  width: min(1180px, 96vw);
+  height: min(940px, 94vh);
+  max-height: 94vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.modal.game-modal .modal-header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.modal.game-modal .modal-header h2 {
+  font-size: 30px;
+}
+
+.modal.game-modal .modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.real-game-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal.game-modal .game-launch-note {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 12px;
+}
+
+.modal.game-modal .real-game-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  border: 4px solid #0f1118;
+  background: #111;
+}
+
+.modal.game-modal .game-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
 @media (max-width: 860px) {
   body {
     padding: 4px;
@@ -778,6 +964,26 @@ canvas {
     min-height: 520px;
   }
 
+  .modal.game-modal {
+    padding: 3px;
+  }
+
+  .modal.game-modal .modal-card {
+    width: 100vw;
+    height: 98vh;
+    max-height: 98vh;
+    padding: 6px;
+  }
+
+  .modal.game-modal .modal-header h2 {
+    font-size: 22px;
+  }
+
+  .modal.game-modal .game-launch-note {
+    font-size: 11px;
+    padding: 7px 8px;
+  }
+
   .help-line {
     font-size: 11px;
   }
@@ -861,6 +1067,68 @@ canvas {
 
 .mobile-controls .move-grid {
   display: none !important;
+}
+
+
+/* v10.6 game modal polish: larger game windows, no nested scrollbar */
+.modal.game-modal {
+  padding: 10px;
+  place-items: center;
+}
+
+.modal.game-modal .modal-card {
+  width: min(1180px, 96vw);
+  height: min(940px, 94vh);
+  max-height: 94vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.modal.game-modal .modal-header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+
+.modal.game-modal .modal-header h2 {
+  font-size: 30px;
+}
+
+.modal.game-modal .modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.real-game-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal.game-modal .game-launch-note {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 12px;
+}
+
+.modal.game-modal .real-game-frame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  border: 4px solid #0f1118;
+  background: #111;
+}
+
+.modal.game-modal .game-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
 }
 
 @media (max-width: 860px) {
