@@ -1183,7 +1183,7 @@
           <strong>${gameName}</strong> · ${noteText}
         </div>
 
-        <iframe class="real-game-frame" src="${src}?v=live-v10-6-ui-polish" title="${gameName}" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="${src}?v=live-v10-8-game-fit" title="${gameName}" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1195,7 +1195,7 @@
     `);
 
     document.getElementById("backToArcadeReal").addEventListener("click", () => { document.getElementById("modal").classList.remove("game-modal"); renderArcadeModal(); });
-    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-6-ui-polish`, "_blank"));
+    document.getElementById("openGameNewTab").addEventListener("click", () => window.open(`${src}?v=live-v10-8-game-fit`, "_blank"));
     document.getElementById("closeArcadeGame").addEventListener("click", closeModal);
   }
 
@@ -1482,7 +1482,7 @@
           <strong>Mystery Kitchen Rush active.</strong> Finish the kitchen run, then confirm the Mystery reveal transaction: <strong>${MYSTERY_CRAFT_BURN_MEAL} $MEAL burn + ${MYSTERY_CRAFT_POOL_MEAL} $MEAL Reward Vault</strong>. Max 3 attempts per wallet/day.
         </div>
 
-        <iframe class="real-game-frame" src="games/order/index.html?v=live-v10-6-ui-polish" title="Mystery Kitchen Rush" scrolling="no"></iframe>
+        <iframe class="real-game-frame" src="games/order/index.html?v=live-v10-8-game-fit" title="Mystery Kitchen Rush" scrolling="no"></iframe>
         <div class="mobile-note"></div>
 
         <div class="game-actions">
@@ -1498,7 +1498,7 @@
       document.getElementById("modal").classList.remove("game-modal");
       renderCraftModal();
     });
-    document.getElementById("openMysteryGameNewTab").addEventListener("click", () => window.open("games/order/index.html?v=live-v10-6-ui-polish", "_blank"));
+    document.getElementById("openMysteryGameNewTab").addEventListener("click", () => window.open("games/order/index.html?v=live-v10-8-game-fit", "_blank"));
     document.getElementById("closeMysteryGame").addEventListener("click", () => {
       activeMysteryCraftRun = null;
       closeModal();
