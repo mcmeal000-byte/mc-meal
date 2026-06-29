@@ -787,19 +787,57 @@
   }
 
   function drawResult() {
-    rounded(92,78,616,470,18,"rgba(13,15,20,.93)",state.result.won?C.green:C.red,4);
-    ctx.fillStyle=state.result.won?C.green:C.red;ctx.font="bold 35px Courier New";ctx.fillText(state.result.won?"SHIFT COMPLETE!":"KITCHEN CLOSED",178,138);
-    ctx.fillStyle=C.cream;ctx.font="19px Courier New";
-    const r=state.result;
-    ctx.fillText("Final Score: "+r.score,190,195);
-    ctx.fillText("Orders Served: "+state.delivered,190,225);
-    ctx.fillText("Best Combo: "+r.rewards.bestCombo,190,255);
-    ctx.fillText("XP Earned: "+r.rewards.xp,190,285);
-    ctx.fillText("Daily Streak: "+r.rewards.streak,190,315);
-    ctx.fillStyle=C.meal;ctx.fillText("Drops: "+r.rewards.drops.join(", "),190,360);
-    if(r.rewards.gotTicket){ctx.fillStyle=C.green;ctx.fillText("Bonus: Mystery Order Ticket!",190,400);}
-    if(r.rewards.gotFragment){ctx.fillStyle=C.green;ctx.fillText("Ultra Bonus: Recipe Fragment!",190,430);}
-    ctx.fillStyle=C.cyan;ctx.fillText("Press ENTER / Tap to play again",190,495);
+    const r = state.result;
+    rounded(110, 92, 740, 520, 18, "rgba(13,15,20,.98)", r.won ? C.green : C.red, 5);
+
+    ctx.fillStyle = r.won ? C.green : C.red;
+    ctx.font = "900 42px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(r.won ? "SHIFT COMPLETE!" : "KITCHEN CLOSED", W / 2, 162);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.cream;
+    ctx.font = "900 24px Arial";
+    let x = 190;
+    let y = 222;
+    const gap = 38;
+    ctx.fillText("Final Score: " + r.score, x, y); y += gap;
+    ctx.fillText("Orders Served: " + state.delivered, x, y); y += gap;
+    ctx.fillText("Best Combo: " + r.rewards.bestCombo, x, y); y += gap;
+    ctx.fillText("XP Earned: " + r.rewards.xp, x, y); y += gap;
+    ctx.fillText("Daily Streak: " + r.rewards.streak, x, y); y += gap + 12;
+
+    ctx.fillStyle = C.meal;
+    ctx.fillText("Drops", x, y); y += 34;
+    ctx.fillStyle = C.cream;
+    ctx.font = "900 22px Arial";
+    const dropLines = wrapText(r.rewards.drops.join(", "), 560);
+    for (const line of dropLines.slice(0, 3)) {
+      ctx.fillText(line, x, y);
+      y += 30;
+    }
+
+    y += 8;
+    if (r.rewards.gotTicket) {
+      ctx.fillStyle = C.green;
+      ctx.fillText("Bonus: Mystery Order Ticket", x, y);
+      y += 32;
+    } else {
+      ctx.fillStyle = "#d8c49a";
+      ctx.fillText("Ticket chance rolled: " + r.rewards.ticketChance + "%", x, y);
+      y += 32;
+    }
+    if (r.rewards.gotFragment) {
+      ctx.fillStyle = C.green;
+      ctx.fillText("Ultra Bonus: Recipe Fragment", x, y);
+      y += 32;
+    }
+
+    ctx.fillStyle = C.cyan;
+    ctx.font = "900 24px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Return to the Kitchen", W / 2, 570);
+    ctx.textAlign = "left";
   }
 
   function drawItem(it,x,y,s=1){

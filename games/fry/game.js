@@ -53,7 +53,33 @@ function rat(x,y,s){const u=4*s;ctx.fillStyle=C.rat;ctx.fillRect(x+2*u,y+4*u,7*u
 function fryBox(x,y,s){const u=4*s;ctx.fillStyle=C.deepRed;ctx.fillRect(x+2*u,y+8*u,16*u,13*u);ctx.fillStyle=C.red;ctx.fillRect(x+3*u,y+9*u,14*u,11*u);for(let i=0;i<7;i++){ctx.fillStyle=C.fry;ctx.fillRect(x+(4+i*2)*u,y+(i%2)*u,1.2*u,10*u)}ctx.fillStyle=C.gold;ctx.font=`${11*s}px Courier New`;ctx.fillText("M",x+7*u,y+17*u)}
 function drawSparks(){st.sparks.forEach(s=>{ctx.globalAlpha=Math.max(0,s.life*3);ctx.fillStyle=s.col;ctx.fillRect(s.x,s.y,4,4);ctx.globalAlpha=1})}
 function levelClear(){const next=Math.min(st.level+1,st.maxLevel);panel(110,182,580,226);ctx.fillStyle=C.green;ctx.font="30px Courier New";centerText(`${LV[st.level-1].name} COMPLETE!`,400,230);ctx.fillStyle=C.text;ctx.font="18px Courier New";centerText(`Score Bonus Added: ${st.level*650}`,400,274);centerText(`Next Order: ${LV[next-1].order}`,400,304);centerText("More speed. Smaller tray. Higher risk.",400,336);centerText("Press ENTER / Tap for next level",400,366)}
-function result(){panel(90,80,620,470);const r=st.result;ctx.fillStyle=r.won?C.green:C.red;ctx.font="34px Courier New";centerText(r.won?"FRY SHIFT COMPLETE!":"KITCHEN CLOSED!",400,132);ctx.fillStyle=C.text;ctx.font="20px Courier New";ctx.fillText(`Final Score: ${r.score}`,160,178);ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${st.maxLevel}`,160,208);ctx.fillText(`Best Combo: ${r.rewards.bestCombo}`,160,238);ctx.fillText(`XP Earned: ${r.rewards.xp}`,160,268);ctx.fillText(`Daily Streak: ${r.rewards.streak}`,160,298);ctx.fillStyle=C.gold;ctx.fillText("Ingredient Drops:",160,340);ctx.fillStyle=C.text;ctx.font="18px Courier New";const lines=wrap(r.rewards.drops.join(", "),390);let y=370;lines.forEach(line=>{ctx.fillText(line,160,y);y+=24});y+=10;if(r.rewards.gotTicket){ctx.fillStyle=C.green;ctx.fillText("Bonus: Mystery Ticket!",160,y);y+=28}else{ctx.fillStyle=C.muted;ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`,160,y);y+=28}if(r.rewards.gotFragment){ctx.fillStyle=C.green;ctx.fillText("Ultra Bonus: Recipe Fragment!",160,y);y+=28}ctx.fillStyle=C.white;ctx.font="18px Courier New";ctx.fillText("Return to Arcade to play again",160,520)}
+function result(){
+panel(44,78,712,510);
+const r=st.result;
+ctx.fillStyle=r.won?C.green:C.red;
+ctx.font="900 38px Arial";
+centerText(r.won?"FRY SHIFT COMPLETE!":"KITCHEN CLOSED",400,138);
+ctx.fillStyle=C.text;
+ctx.font="900 22px Arial";
+let x=112,y=192,gap=36;
+ctx.fillText(`Final Score: ${r.score}`,x,y); y+=gap;
+ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${st.maxLevel}`,x,y); y+=gap;
+ctx.fillText(`Best Combo: ${r.rewards.bestCombo}`,x,y); y+=gap;
+ctx.fillText(`XP Earned: ${r.rewards.xp}`,x,y); y+=gap;
+ctx.fillText(`Daily Streak: ${r.rewards.streak}`,x,y); y+=gap+10;
+ctx.fillStyle=C.gold;
+ctx.fillText("Ingredient Drops",x,y); y+=34;
+ctx.fillStyle=C.text;
+ctx.font="900 20px Arial";
+const lines=wrap(r.rewards.drops.join(", "),560);
+lines.slice(0,3).forEach(line=>{ctx.fillText(line,x,y);y+=28});
+y+=8;
+if(r.rewards.gotTicket){ctx.fillStyle=C.green;ctx.fillText("Bonus: Mystery Ticket",x,y);y+=30}else{ctx.fillStyle=C.muted;ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`,x,y);y+=30}
+if(r.rewards.gotFragment){ctx.fillStyle=C.green;ctx.fillText("Ultra Bonus: Recipe Fragment",x,y);y+=30}
+ctx.fillStyle=C.white;
+ctx.font="900 22px Arial";
+centerText("Return to Arcade to play again",400,548);
+}
 function panel(x,y,w,h){ctx.fillStyle="#0f1118";ctx.fillRect(x,y,w,h);ctx.strokeStyle=C.orange;ctx.lineWidth=4;ctx.strokeRect(x,y,w,h);ctx.strokeStyle=C.darkOrange;ctx.lineWidth=2;ctx.strokeRect(x+8,y+8,w-16,h-16)}
 function centerText(t,x,y){ctx.fillText(t,x-ctx.measureText(t).width/2,y)}
 function wrap(text,max){const words=String(text||"").split(/\s+/),lines=[];let line="";for(const w of words){const t=line?line+" "+w:w;if(ctx.measureText(t).width<=max)line=t;else{if(line)lines.push(line);line=w}}if(line)lines.push(line);return lines}

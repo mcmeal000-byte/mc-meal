@@ -49,7 +49,33 @@ function drawBubbles(){ctx.fillStyle=C.cyan;st.bubbles.forEach(b=>{ctx.globalAlp
 function orderZone(){panel(214,582,372,74);ctx.fillStyle=C.meal;ctx.font="14px Courier New";centerText("ORDER TRAY",400,606);ctx.fillStyle=C.text;ctx.font="12px Courier New";centerText("Perfect fills = Soda + Sauce",400,628);centerText("Large cups score more",400,644)}
 function drawBigCup(x,y,s){const u=4*s;ctx.fillStyle=C.cupDark;ctx.fillRect(x+2*u,y+2*u,14*u,20*u);ctx.fillStyle=C.cup;ctx.fillRect(x+3*u,y+3*u,12*u,18*u);ctx.fillStyle=C.blue;ctx.fillRect(x+4*u,y+9*u,10*u,11*u);ctx.fillStyle=C.white;ctx.fillRect(x+4*u,y+8*u,10*u,2*u);ctx.fillStyle=C.purple;ctx.fillRect(x+11*u,y+5*u,2*u,14*u)}
 function levelClear(){const next=Math.min(st.level+1,st.maxLevel);panel(115,182,570,226);ctx.fillStyle=C.green;ctx.font="30px Courier New";centerText(`${LV[st.level-1].name} COMPLETE!`,400,230);ctx.fillStyle=C.text;ctx.font="18px Courier New";centerText(`Score Bonus Added: ${st.level*700}`,400,274);centerText(`Next Order: ${LV[next-1].order}`,400,304);centerText("New cup sizes, faster movement, tighter targets.",400,336);centerText("Press ENTER / Tap for next level",400,366)}
-function result(){panel(90,80,620,470);const r=st.result;ctx.fillStyle=r.won?C.green:C.red;ctx.font="34px Courier New";centerText(r.won?"SODA SHIFT COMPLETE!":"KITCHEN CLOSED!",400,132);ctx.fillStyle=C.text;ctx.font="20px Courier New";ctx.fillText(`Final Score: ${r.score}`,160,178);ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${st.maxLevel}`,160,208);ctx.fillText(`Best Combo: ${r.rewards.bestCombo}`,160,238);ctx.fillText(`XP Earned: ${r.rewards.xp}`,160,268);ctx.fillText(`Daily Streak: ${r.rewards.streak}`,160,298);ctx.fillStyle=C.meal;ctx.fillText("Ingredient Drops:",160,340);ctx.fillStyle=C.text;ctx.font="18px Courier New";const lines=wrap(r.rewards.drops.join(", "),390);let y=370;lines.forEach(line=>{ctx.fillText(line,160,y);y+=24});y+=10;if(r.rewards.gotTicket){ctx.fillStyle=C.green;ctx.fillText("Bonus: Mystery Ticket!",160,y);y+=28}else{ctx.fillStyle=C.muted;ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`,160,y);y+=28}if(r.rewards.gotFragment){ctx.fillStyle=C.green;ctx.fillText("Ultra Bonus: Recipe Fragment!",160,y);y+=28}ctx.fillStyle=C.white;ctx.font="18px Courier New";ctx.fillText("Return to Arcade to play again",160,520)}
+function result(){
+panel(44,78,712,510);
+const r=st.result;
+ctx.fillStyle=r.won?C.green:C.red;
+ctx.font="900 38px Arial";
+centerText(r.won?"SODA SHIFT COMPLETE!":"KITCHEN CLOSED",400,138);
+ctx.fillStyle=C.text;
+ctx.font="900 22px Arial";
+let x=112,y=192,gap=36;
+ctx.fillText(`Final Score: ${r.score}`,x,y); y+=gap;
+ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${st.maxLevel}`,x,y); y+=gap;
+ctx.fillText(`Best Combo: ${r.rewards.bestCombo}`,x,y); y+=gap;
+ctx.fillText(`XP Earned: ${r.rewards.xp}`,x,y); y+=gap;
+ctx.fillText(`Daily Streak: ${r.rewards.streak}`,x,y); y+=gap+10;
+ctx.fillStyle=C.meal;
+ctx.fillText("Ingredient Drops",x,y); y+=34;
+ctx.fillStyle=C.text;
+ctx.font="900 20px Arial";
+const lines=wrap(r.rewards.drops.join(", "),560);
+lines.slice(0,3).forEach(line=>{ctx.fillText(line,x,y);y+=28});
+y+=8;
+if(r.rewards.gotTicket){ctx.fillStyle=C.green;ctx.fillText("Bonus: Mystery Ticket",x,y);y+=30}else{ctx.fillStyle=C.muted;ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`,x,y);y+=30}
+if(r.rewards.gotFragment){ctx.fillStyle=C.green;ctx.fillText("Ultra Bonus: Recipe Fragment",x,y);y+=30}
+ctx.fillStyle=C.white;
+ctx.font="900 22px Arial";
+centerText("Return to Arcade to play again",400,548);
+}
 function panel(x,y,w,h){ctx.fillStyle=C.panel;ctx.fillRect(x,y,w,h);ctx.strokeStyle=C.floor;ctx.lineWidth=4;ctx.strokeRect(x,y,w,h);ctx.strokeStyle=C.floorDark;ctx.lineWidth=2;ctx.strokeRect(x+8,y+8,w-16,h-16)}
 function centerText(t,x,y){ctx.fillText(t,x-ctx.measureText(t).width/2,y)}
 function wrap(text,max){const words=String(text||"").split(/\s+/),lines=[];let line="";for(const w of words){const t=line?line+" "+w:w;if(ctx.measureText(t).width<=max)line=t;else{if(line)lines.push(line);line=w}}if(line)lines.push(line);return lines}

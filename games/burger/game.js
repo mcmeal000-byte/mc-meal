@@ -1027,44 +1027,57 @@ function finishRun(won) {
   }
 
   function drawResult() {
-    drawPanel(100, 90, 600, 420);
     const r = state.result;
-    ctx.fillStyle = r.won ? COLORS.green : COLORS.red;
-    ctx.font = "34px Courier New";
-    ctx.fillText(r.won ? "SHIFT COMPLETE!" : "KITCHEN CLOSED!", 185, 140);
+    drawPanel(44, 82, 712, 500);
 
+    ctx.fillStyle = r.won ? COLORS.green : COLORS.red;
+    ctx.font = "900 38px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(r.won ? "SHIFT COMPLETE!" : "KITCHEN CLOSED", 400, 142);
+
+    ctx.textAlign = "left";
     ctx.fillStyle = COLORS.text;
-    ctx.font = "20px Courier New";
-    ctx.fillText(`Final Score: ${r.score}`, 170, 186);
-    ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${state.maxLevel}`, 170, 216);
-    ctx.fillText(`XP Earned: ${r.rewards.xp}`, 170, 246);
-    ctx.fillText(`Daily Streak: ${r.rewards.streak}`, 170, 276);
+    ctx.font = "900 22px Arial";
+    const x = 112;
+    let y = 195;
+    const gap = 36;
+    ctx.fillText(`Final Score: ${r.score}`, x, y); y += gap;
+    ctx.fillText(`Levels Cleared: ${r.levelsCleared}/${state.maxLevel}`, x, y); y += gap;
+    ctx.fillText(`XP Earned: ${r.rewards.xp}`, x, y); y += gap;
+    ctx.fillText(`Daily Streak: ${r.rewards.streak}`, x, y); y += gap + 10;
 
     ctx.fillStyle = COLORS.meal;
-    ctx.fillText("Ingredient Drops:", 170, 320);
+    ctx.fillText("Ingredient Drops", x, y); y += 34;
     ctx.fillStyle = COLORS.text;
-    ctx.fillText(r.rewards.drops.join(", "), 170, 350);
+    ctx.font = "900 20px Arial";
+    const dropLines = wrapText(r.rewards.drops.join(", "), 560);
+    for (const line of dropLines.slice(0, 3)) {
+      ctx.fillText(line, x, y);
+      y += 28;
+    }
 
-    let y = 386;
+    y += 8;
     if (r.rewards.gotTicket) {
       ctx.fillStyle = COLORS.green;
-      ctx.fillText("Bonus: Mystery Order Ticket!", 170, y);
-      y += 28;
+      ctx.fillText("Bonus: Mystery Order Ticket", x, y);
+      y += 30;
     } else {
-      ctx.fillStyle = "#b9a88a";
-      ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`, 170, y);
-      y += 28;
+      ctx.fillStyle = "#d8c49a";
+      ctx.fillText(`Ticket chance rolled: ${r.rewards.ticketChance}%`, x, y);
+      y += 30;
     }
 
     if (r.rewards.gotFragment) {
       ctx.fillStyle = COLORS.green;
-      ctx.fillText("Ultra Bonus: Rare Recipe Fragment!", 170, y);
-      y += 28;
+      ctx.fillText("Ultra Bonus: Rare Recipe Fragment", x, y);
+      y += 30;
     }
 
     ctx.fillStyle = COLORS.white;
-    ctx.font = "18px Courier New";
-    ctx.fillText("Return to Arcade to play again", 170, 470);
+    ctx.font = "900 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Return to Arcade to play again", 400, 540);
+    ctx.textAlign = "left";
   }
 
   function drawPanel(x, y, w, h) {
